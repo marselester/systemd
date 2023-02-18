@@ -1,0 +1,111 @@
+// Package systemd provides access to systemd via dbus
+// using Unix domain sockets as a transport.
+// The objective of this package is to list processes
+// with low overhead for the caller.
+package systemd
+
+import (
+	"fmt"
+	"net"
+	"os"
+	"strings"
+	"sync"
+)
+
+// Dial connects to dbus via a Unix domain socket
+// specified by DBUS_SESSION_BUS_ADDRESS env var,
+// for example, "unix:path=/run/user/1000/bus".
+func Dial() (*net.UnixConn, error) {
+	busAddr := os.Getenv("DBUS_SESSION_BUS_ADDRESS")
+	prefix := "unix:path="
+	if !strings.HasPrefix(busAddr, prefix) {
+		return nil, fmt.Errorf("dbus address not found")
+	}
+	path := busAddr[len(prefix):]
+
+	conn, err := net.DialUnix("unix", nil, &net.UnixAddr{
+		Name: path,
+		Net:  "unix",
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return conn, nil
+}
+
+// New creates a new Client to access systemd via dbus.
+// By default, the external auth is used.
+func New(conn *net.UnixConn) (*Client, error) {
+	var err error
+
+	// Send null byte as required by the protocol.
+	if _, err := conn.Write([]byte{0}); err != nil {
+		return nil, fmt.Errorf("dbus send null failed: %w", err)
+	}
+
+	if err = authExternal(conn); err != nil {
+		return nil, fmt.Errorf("dbus auth failed: %w", err)
+	}
+
+	if err = sendHello(conn); err != nil {
+		return nil, fmt.Errorf("dbus hello failed: %w", err)
+	}
+
+	c := Client{
+		conn:   conn,
+		msgDec: newMessageDecoder(),
+	}
+	return &c, nil
+}
+
+// Client provides access to systemd via dbus.
+// A caller shouldn't use Client concurrently.
+type Client struct {
+	conn   *net.UnixConn
+	msgDec *messageDecoder
+
+	// According to https://dbus.freedesktop.org/doc/dbus-specification.html
+	// D-Bus connection receives messages serially.
+	// The client doesn't have to wait for replies before sending more messages.
+	// The client can match the replies with a serial number it included in a request.
+	//
+	// This Client implementation doesn't allow to call its methods concurrently,
+	// because a caller could send multiple messages,
+	// and the Client would read message fragments from the same connection.
+	mu sync.Mutex
+	// The serial of this message,
+	// used as a cookie by the sender to identify the reply corresponding to this request.
+	msgSerial uint32
+}
+
+func (c *Client) ListUnits(f func(*Unit)) error {
+	if !c.mu.TryLock() {
+		return fmt.Errorf("must be called serially")
+	}
+	defer c.mu.Unlock()
+
+	// Send a dbus message that calls
+	// org.freedesktop.systemd1.Manager.ListUnits method
+	// to get an array of all currently loaded systemd units.
+	_, err := c.conn.Write(listUnitsMsg)
+	if err != nil {
+		return err
+	}
+
+	return c.msgDec.ListUnits(c.conn, f)
+}
+
+// MainPID returns the main PID of the service.
+// Note, you can't call this method within ListUnits's f func,
+// because that would imply concurrent reading from the same underlying connection.
+// Simply waiting on a lock won't help, because ListUnits won't be able to
+// finish waiting for MainPID, thus creating a deadlock.
+func (c *Client) MainPID(service string) (int, error) {
+	if !c.mu.TryLock() {
+		return 0, fmt.Errorf("must be called serially")
+	}
+	defer c.mu.Unlock()
+
+	return 0, nil
+}
