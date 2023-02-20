@@ -1,0 +1,26 @@
+goos: linux
+goarch: amd64
+pkg: github.com/marselester/systemd
+cpu: Intel(R) Core(TM) i5-10600 CPU @ 3.30GHz
+BenchmarkDecodeString-2      	22846780	        54.82 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDecodeString-2      	19247810	        52.44 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDecodeString-2      	22579364	        54.07 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDecodeString-2      	22461930	        53.77 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDecodeString-2      	22263738	        55.18 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDecodeString-2      	22837857	        52.79 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDecodeString-2      	22355800	        54.00 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDecodeString-2      	22677855	        53.48 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDecodeString-2      	22751535	        53.90 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDecodeString-2      	22221135	        53.89 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDecodeListUnits-2   	    9475	    110608 ns/op	   75977 B/op	      21 allocs/op
+BenchmarkDecodeListUnits-2   	   10000	    112801 ns/op	   75977 B/op	      21 allocs/op
+BenchmarkDecodeListUnits-2   	    9280	    118471 ns/op	   75977 B/op	      21 allocs/op
+BenchmarkDecodeListUnits-2   	    9086	    122137 ns/op	   75977 B/op	      21 allocs/op
+BenchmarkDecodeListUnits-2   	   10000	    114979 ns/op	   75977 B/op	      21 allocs/op
+BenchmarkDecodeListUnits-2   	    8437	    134339 ns/op	   75978 B/op	      21 allocs/op
+BenchmarkDecodeListUnits-2   	   10000	    123830 ns/op	   75977 B/op	      21 allocs/op
+BenchmarkDecodeListUnits-2   	    8986	    134621 ns/op	   75977 B/op	      21 allocs/op
+BenchmarkDecodeListUnits-2   	   11050	    127659 ns/op	   75978 B/op	      21 allocs/op
+BenchmarkDecodeListUnits-2   	    8950	    120915 ns/op	   75976 B/op	      21 allocs/op
+PASS
+ok  	github.com/marselester/systemd	27.683s
