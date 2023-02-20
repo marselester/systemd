@@ -41,7 +41,7 @@ func newMessageDecoder() *messageDecoder {
 	return &messageDecoder{
 		buf: &bytes.Buffer{},
 		dec: newDecoder(nil),
-		// With 4KB buffer, 35867B message takes 75977 B/op, 21 allocs/op.
+		// With 4KB buffer, 35867B message takes 25603 B/op, 9 allocs/op.
 		conv: newStringConverter(4096),
 	}
 }

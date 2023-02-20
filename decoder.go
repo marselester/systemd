@@ -198,8 +198,7 @@ func nextOffset(current, align uint32) (next, padding uint32) {
 
 func newStringConverter(cap int) *stringConverter {
 	return &stringConverter{
-		buf:    bytes.NewBuffer(make([]byte, 0, cap)),
-		cap:    cap,
+		buf:    make([]byte, 0, cap),
 		offset: 0,
 	}
 }
@@ -215,28 +214,26 @@ func newStringConverter(cap int) *stringConverter {
 // with no side effects to the returned strings.
 type stringConverter struct {
 	// buf is a temporary buffer where decoded strings are batched.
-	buf *bytes.Buffer
-	// cap is a buffer capacity.
-	cap int
+	buf []byte
 	// offset is a buffer position where the last string was written.
 	offset int
 }
 
 // String converts bytes to a string.
 func (c *stringConverter) String(b []byte) string {
-	if c.buf.Len() > c.cap {
-		c.buf = bytes.NewBuffer(make([]byte, 0, c.cap))
-		c.offset = 0
-	}
-
-	// Buffer always returns nil error.
-	n, _ := c.buf.Write(b)
+	n := len(b)
 	if n == 0 {
 		return ""
 	}
 
-	b = c.buf.Bytes()[c.offset:]
-	s := unsafe.String(&b[0], len(b))
+	if len(c.buf)+n > cap(c.buf) {
+		c.buf = make([]byte, 0, cap(c.buf))
+		c.offset = 0
+	}
+	c.buf = append(c.buf, b...)
+
+	b = c.buf[c.offset:]
+	s := unsafe.String(&b[0], n)
 	c.offset += n
 	return s
 }
