@@ -1,6 +1,7 @@
 package systemd
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
@@ -39,8 +40,9 @@ type Unit struct {
 
 func newMessageDecoder() *messageDecoder {
 	return &messageDecoder{
-		buf: &bytes.Buffer{},
-		dec: newDecoder(nil),
+		bufConn: bufio.NewReaderSize(nil, 4096),
+		buf:     &bytes.Buffer{},
+		dec:     newDecoder(nil),
 		// With 4KB buffer, 35867B message takes 25603 B/op, 9 allocs/op.
 		conv: newStringConverter(4096),
 	}
@@ -48,9 +50,13 @@ func newMessageDecoder() *messageDecoder {
 
 // messageDecoder is responsible for decoding responses from dbus method calls.
 type messageDecoder struct {
-	buf  *bytes.Buffer
-	dec  *decoder
-	conv *stringConverter
+	// bufConn buffers the reads from a connection
+	// thus reducing count of read syscalls (from 4079 to 12 in DecodeListUnits),
+	// but it takes 1% longer for DecodeString, and 3% for DecodeListUnits.
+	bufConn *bufio.Reader
+	buf     *bytes.Buffer
+	dec     *decoder
+	conv    *stringConverter
 
 	// The following fields are reused to reduce memory allocs.
 	unit Unit
@@ -59,9 +65,11 @@ type messageDecoder struct {
 
 // ListUnits decodes a reply from systemd ListUnits method.
 func (d *messageDecoder) ListUnits(conn io.Reader, f func(*Unit)) error {
+	d.bufConn.Reset(conn)
+
 	// Read the fixed portion of the message header (16 bytes),
 	// and set the position of the next byte we should be reading from.
-	err := decodeMessageHead(conn, &d.msgh, d.buf)
+	err := decodeMessageHead(d.bufConn, &d.msgh, d.buf)
 	if err != nil {
 		return fmt.Errorf("message head: %w", err)
 	}
@@ -75,7 +83,7 @@ func (d *messageDecoder) ListUnits(conn io.Reader, f func(*Unit)) error {
 	// The header usually occupies 61 bytes.
 	// Since we already know the signature from the spec,
 	// the header is discarded.
-	if _, err = readN(conn, d.buf, d.msgh.HeaderLen); err != nil {
+	if _, err = readN(d.bufConn, d.buf, int(d.msgh.HeaderLen)); err != nil {
 		return fmt.Errorf("message header: %w", err)
 	}
 	offset += d.msgh.HeaderLen
@@ -86,7 +94,7 @@ func (d *messageDecoder) ListUnits(conn io.Reader, f func(*Unit)) error {
 	// up to 7 bytes of alignment padding is added.
 	// Here we're discarding the header padding.
 	offset, padding := nextOffset(offset, 8)
-	if _, err = readN(conn, d.buf, padding); err != nil {
+	if _, err = readN(d.bufConn, d.buf, int(padding)); err != nil {
 		return fmt.Errorf("discard header padding: %w", err)
 	}
 
@@ -95,16 +103,14 @@ func (d *messageDecoder) ListUnits(conn io.Reader, f func(*Unit)) error {
 	// we should stop reading at offset 35794,
 	// because the body starts at offset 80,
 	// i.e., offset 35794 = 16 head + 61 header + 3 padding + 35714 body.
-	{
-		body := io.LimitReader(
-			conn,
-			int64(d.msgh.BodyLen),
-		)
-		d.dec.Reset(body)
-		d.dec.SetOffset(offset)
-		if d.msgh.ByteOrder != littleEndian {
-			d.dec.SetOrder(d.msgh.Order())
-		}
+	body := io.LimitReader(
+		d.bufConn,
+		int64(d.msgh.BodyLen),
+	)
+	d.dec.Reset(body)
+	d.dec.SetOffset(offset)
+	if d.msgh.ByteOrder != littleEndian {
+		d.dec.SetOrder(d.msgh.Order())
 	}
 
 	// ListUnits has a body signature "a(ssssssouso)" which is

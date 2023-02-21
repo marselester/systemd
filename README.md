@@ -46,7 +46,9 @@ $ golangci-lint run
 ```
 
 Benchmarks help to spot performance changes
-and troubleshoot performance issues, e.g., by profiling memory.
+and troubleshoot performance issues.
+For example, you can see where and how much memory gets allocated
+when a 35KB D-Bus ListUnits reply is decoded into 157 Unit structs.
 
 ```sh
 $ go test -run=^$ -bench=^BenchmarkDecodeListUnits$ -benchmem -memprofile list_units.allocs
@@ -57,7 +59,7 @@ It is recommended to run benchmarks multiple times and check
 how stable they are using [Benchstat](https://pkg.go.dev/golang.org/x/perf/cmd/benchstat) tool.
 
 ```sh
-$ go test -bench=. -benchmem -count=10 . | tee bench-new.txt
+$ go test -bench=. -benchmem -count=100 . | tee bench-new.txt
 ```
 
 <details>

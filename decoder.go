@@ -126,7 +126,7 @@ func (d *decoder) Align(n uint32) error {
 		return nil
 	}
 
-	_, err := readN(d.src, d.buf, padding)
+	_, err := readN(d.src, d.buf, int(padding))
 	d.offset = offset
 	return err
 }
@@ -161,7 +161,7 @@ func (d *decoder) String() ([]byte, error) {
 	strLen++
 
 	// Read the string content.
-	b, err := readN(d.src, d.buf, strLen)
+	b, err := readN(d.src, d.buf, int(strLen))
 	if err != nil {
 		return nil, err
 	}
@@ -173,15 +173,33 @@ func (d *decoder) String() ([]byte, error) {
 // readN reads exactly n bytes from src into the buffer.
 // The buffer grows on demand.
 // The objective is to reduce memory allocs.
-func readN(src io.Reader, buf *bytes.Buffer, n uint32) ([]byte, error) {
+func readN(src io.Reader, buf *bytes.Buffer, n int) ([]byte, error) {
 	buf.Reset()
-	buf.Grow(int(n))
+	buf.Grow(n)
 	b := buf.Bytes()[:n]
-	if _, err := src.Read(b); err != nil {
+
+	// Since src is buffered, a single Read call
+	// doesn't guarantee that all required n bytes will be read.
+	// The second Read call fetches the remaining bytes.
+	//
+	// If the requested n bytes don't fit into src' buffer,
+	// it doesn't buffer them, so there can't be three calls.
+	//
+	// Reading in a loop would simplify the reasoning,
+	// but it works 8.51% slower for DecodeString, and 4.23% for DecodeListUnits.
+	// TODO: See if bufio.Reader can be replaced by a faster version.
+	var (
+		k   int
+		err error
+	)
+	if k, err = src.Read(b); err != nil {
 		return nil, err
 	}
+	if k != n {
+		k, err = src.Read(b[k:])
+	}
 
-	return b, nil
+	return b, err
 }
 
 // nextOffset returns the next byte position and the padding
@@ -224,6 +242,10 @@ func (c *stringConverter) String(b []byte) string {
 	n := len(b)
 	if n == 0 {
 		return ""
+	}
+	// Must allocate because a string doesn't fit into the buffer.
+	if n > cap(c.buf) {
+		return string(b)
 	}
 
 	if len(c.buf)+n > cap(c.buf) {
