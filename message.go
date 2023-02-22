@@ -64,6 +64,8 @@ type messageDecoder struct {
 }
 
 // ListUnits decodes a reply from systemd ListUnits method.
+// The pointer to Unit struct in f must not be retained,
+// because its fields change on each f call.
 func (d *messageDecoder) ListUnits(conn io.Reader, f func(*Unit)) error {
 	d.bufConn.Reset(conn)
 

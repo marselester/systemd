@@ -3,7 +3,6 @@ package systemd
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"io"
 	"unsafe"
 )
@@ -68,15 +67,20 @@ func (mh *messageHead) Order() binary.ByteOrder {
 // The caller can later decode "(yv)" structs knowing how many bytes to process
 // based on the header length.
 func decodeMessageHead(conn io.Reader, mh *messageHead, buf *bytes.Buffer) (err error) {
-	buf.Reset()
-	if _, err = io.CopyN(buf, conn, messageHeadSize); err != nil {
+	b, err := readN(conn, buf, messageHeadSize)
+	if err != nil {
 		return err
 	}
 
-	mh.ByteOrder = buf.Bytes()[0]
-	if err = binary.Read(buf, mh.Order(), mh); err != nil {
-		return fmt.Errorf("binary decode: %w", err)
-	}
+	mh.ByteOrder = b[0]
+	mh.Type = b[1]
+	mh.Flags = b[2]
+	mh.Proto = b[3]
+
+	order := mh.Order()
+	mh.BodyLen = order.Uint32(b[4:8])
+	mh.Serial = order.Uint32(b[8:12])
+	mh.HeaderLen = order.Uint32(b[12:])
 
 	return nil
 }

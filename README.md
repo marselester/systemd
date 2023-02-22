@@ -60,35 +60,10 @@ how stable they are using [Benchstat](https://pkg.go.dev/golang.org/x/perf/cmd/b
 
 ```sh
 $ go test -bench=. -benchmem -count=100 . | tee bench-new.txt
+$ benchstat bench-new.txt
 ```
 
-<details>
-
-<summary>
-
-```sh
-$ benchstat bench-old.txt
-```
-
-</summary>
-
-```
-name               time/op
-DecodeString-2     53.8ns ± 1%
-DecodeListUnits-2   101µs ±22%
-
-name               alloc/op
-DecodeString-2      0.00B
-DecodeListUnits-2  25.6kB ± 0%
-
-name               allocs/op
-DecodeString-2       0.00
-DecodeListUnits-2    9.00 ± 0%
-```
-
-</details>
-
-The old and new stats are compared as follows.
+[The old](bench-old.txt) and new stats are compared as follows.
 
 <details>
 
@@ -102,22 +77,22 @@ $ benchstat bench-old.txt bench-new.txt
 
 ```
 name               old time/op    new time/op    delta
-DecodeString-2       53.8ns ± 3%    53.8ns ± 1%     ~     (p=0.645 n=10+9)
-DecodeListUnits-2     122µs ±10%     101µs ±22%  -17.29%  (p=0.000 n=10+10)
+DecodeString-2       53.3ns ± 3%    54.1ns ± 2%   +1.48%  (p=0.000 n=100+98)
+DecodeListUnits-2    98.4µs ±15%   102.4µs ±14%   +4.10%  (p=0.000 n=90+96)
 
 name               old alloc/op   new alloc/op   delta
 DecodeString-2        0.00B          0.00B          ~     (all equal)
-DecodeListUnits-2    76.0kB ± 0%    25.6kB ± 0%  -66.30%  (p=0.002 n=7+8)
+DecodeListUnits-2    25.6kB ± 0%    25.6kB ± 0%   -0.16%  (p=0.000 n=89+100)
 
 name               old allocs/op  new allocs/op  delta
 DecodeString-2         0.00           0.00          ~     (all equal)
-DecodeListUnits-2      21.0 ± 0%       9.0 ± 0%  -57.14%  (p=0.000 n=10+10)
+DecodeListUnits-2      9.00 ± 0%      7.00 ± 0%  -22.22%  (p=0.000 n=100+100)
 ```
 
 </details>
 
 When there is a statistically significant improvement,
-please update `bench-old.txt` and the benchmark results above.
+please update [bench-old.txt](bench-old.txt) and the benchmark results above.
 
 ```sh
 $ cp bench-new.txt bench-old.txt
