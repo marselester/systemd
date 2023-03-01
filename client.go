@@ -88,24 +88,34 @@ func (c *Client) ListUnits(f func(*Unit)) error {
 	// Send a dbus message that calls
 	// org.freedesktop.systemd1.Manager.ListUnits method
 	// to get an array of all currently loaded systemd units.
-	_, err := c.conn.Write(listUnitsMsg)
+	_, err := c.conn.Write(listUnitsRequest)
 	if err != nil {
 		return err
 	}
 
-	return c.msgDec.ListUnits(c.conn, f)
+	return c.msgDec.DecodeListUnits(c.conn, f)
 }
 
-// MainPID returns the main PID of the service.
+// MainPID returns the main PID of the service or 0 if there was an error.
+//
 // Note, you can't call this method within ListUnits's f func,
 // because that would imply concurrent reading from the same underlying connection.
 // Simply waiting on a lock won't help, because ListUnits won't be able to
 // finish waiting for MainPID, thus creating a deadlock.
-func (c *Client) MainPID(service string) (int, error) {
+func (c *Client) MainPID(service string) (uint32, error) {
 	if !c.mu.TryLock() {
 		return 0, fmt.Errorf("must be called serially")
 	}
 	defer c.mu.Unlock()
 
-	return 0, nil
+	// Send a dbus message that calls
+	// org.freedesktop.DBus.Properties.Get method
+	// to retrieve MainPID property from
+	// org.freedesktop.systemd1.Service interface.
+	_, err := c.conn.Write(mainPIDRequest)
+	if err != nil {
+		return 0, err
+	}
+
+	return c.msgDec.DecodeMainPID(c.conn)
 }

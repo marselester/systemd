@@ -10,6 +10,24 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+func TestDecodeMainPID(t *testing.T) {
+	conn := bytes.NewReader(mainPIDResponse)
+	msgDec := newMessageDecoder()
+
+	pid, err := msgDec.DecodeMainPID(conn)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var want uint32 = 2375
+	if want != pid {
+		t.Errorf("expected pid %d got %d", want, pid)
+	}
+}
+
+// -us:1.38gvs:1.0uG
+var mainPIDResponse = []byte{108, 2, 1, 1, 8, 0, 0, 0, 215, 8, 0, 0, 45, 0, 0, 0, 5, 1, 117, 0, 3, 0, 0, 0, 6, 1, 115, 0, 6, 0, 0, 0, 58, 49, 46, 51, 56, 56, 0, 0, 8, 1, 103, 0, 1, 118, 0, 0, 7, 1, 115, 0, 4, 0, 0, 0, 58, 49, 46, 48, 0, 0, 0, 0, 1, 117, 0, 0, 71, 9, 0, 0}
+
 func TestDecodeListUnits(t *testing.T) {
 	conn := bytes.NewReader(listUnitResponse)
 	msgDec := newMessageDecoder()
@@ -20,7 +38,7 @@ func TestDecodeListUnits(t *testing.T) {
 	runtime.ReadMemStats(stat)
 	liveBefore := int(stat.Mallocs - stat.Frees)
 
-	err := msgDec.ListUnits(conn, func(u *Unit) {
+	err := msgDec.DecodeListUnits(conn, func(u *Unit) {
 		if strings.HasSuffix(u.Name, ".service") {
 			got = append(got, *u)
 		}
@@ -54,7 +72,7 @@ func BenchmarkDecodeListUnits(b *testing.B) {
 		conn.Seek(0, io.SeekStart)
 		got = got[:0]
 
-		err := msgDec.ListUnits(conn, func(u *Unit) {
+		err := msgDec.DecodeListUnits(conn, func(u *Unit) {
 			if strings.HasSuffix(u.Name, ".service") {
 				got = append(got, *u)
 			}

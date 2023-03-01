@@ -34,7 +34,7 @@ func main() {
 	}
 
 	if *onlyServices {
-		err = c.ListUnits(printServices)
+		err = printServices(c)
 	} else {
 		err = c.ListUnits(printAll)
 	}
@@ -51,8 +51,29 @@ func printAll(u *systemd.Unit) {
 	fmt.Printf("%s %s\n", u.Name, u.ActiveState)
 }
 
-func printServices(u *systemd.Unit) {
-	if strings.HasSuffix(u.Name, ".service") {
-		fmt.Printf("%s %s\n", u.Name, u.ActiveState)
+// printServices prints service names along with their PIDs.
+// It ignores non-service units.
+func printServices(c *systemd.Client) error {
+	var services []systemd.Unit
+	err := c.ListUnits(func(u *systemd.Unit) {
+		if strings.HasSuffix(u.Name, ".service") {
+			// Must copy a unit,
+			// otherwise it will be modified on the next function call.
+			services = append(services, *u)
+		}
+	})
+	if err != nil {
+		return err
 	}
+
+	var pid uint32
+	for _, s := range services {
+		if pid, err = c.MainPID(s.Name); err != nil {
+			return err
+		}
+
+		fmt.Printf("%d %s %s\n", pid, s.Name, s.ActiveState)
+	}
+
+	return nil
 }

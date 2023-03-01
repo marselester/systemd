@@ -63,10 +63,10 @@ type messageDecoder struct {
 	msgh messageHead
 }
 
-// ListUnits decodes a reply from systemd ListUnits method.
+// DecodeListUnits decodes a reply from systemd ListUnits method.
 // The pointer to Unit struct in f must not be retained,
 // because its fields change on each f call.
-func (d *messageDecoder) ListUnits(conn io.Reader, f func(*Unit)) error {
+func (d *messageDecoder) DecodeListUnits(conn io.Reader, f func(*Unit)) error {
 	d.bufConn.Reset(conn)
 
 	// Read the fixed portion of the message header (16 bytes),
@@ -76,10 +76,6 @@ func (d *messageDecoder) ListUnits(conn io.Reader, f func(*Unit)) error {
 		return fmt.Errorf("message head: %w", err)
 	}
 	var offset uint32 = messageHeadSize
-
-	if d.msgh.BodyLen > maxMessageSize {
-		return fmt.Errorf("message exceeded the maximum length: %d/%d bytes", d.msgh.BodyLen, maxMessageSize)
-	}
 
 	// Read the message header where the body signature is stored.
 	// The header usually occupies 61 bytes.
@@ -170,4 +166,48 @@ func decodeUnit(d *decoder, conv *stringConverter, unit *Unit) error {
 	return nil
 }
 
-var listUnitsMsg = []byte{108, 1, 0, 1, 0, 0, 0, 0, 2, 0, 0, 0, 145, 0, 0, 0, 3, 1, 115, 0, 9, 0, 0, 0, 76, 105, 115, 116, 85, 110, 105, 116, 115, 0, 0, 0, 0, 0, 0, 0, 2, 1, 115, 0, 32, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 115, 121, 115, 116, 101, 109, 100, 49, 46, 77, 97, 110, 97, 103, 101, 114, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 111, 0, 25, 0, 0, 0, 47, 111, 114, 103, 47, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 47, 115, 121, 115, 116, 101, 109, 100, 49, 0, 0, 0, 0, 0, 0, 0, 6, 1, 115, 0, 24, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 115, 121, 115, 116, 101, 109, 100, 49, 0, 0, 0, 0, 0, 0, 0, 0}
+// listUnitsRequest is a hardcoded D-Bus message to request all systemd units.
+var listUnitsRequest = []byte{108, 1, 0, 1, 0, 0, 0, 0, 2, 0, 0, 0, 145, 0, 0, 0, 3, 1, 115, 0, 9, 0, 0, 0, 76, 105, 115, 116, 85, 110, 105, 116, 115, 0, 0, 0, 0, 0, 0, 0, 2, 1, 115, 0, 32, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 115, 121, 115, 116, 101, 109, 100, 49, 46, 77, 97, 110, 97, 103, 101, 114, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 111, 0, 25, 0, 0, 0, 47, 111, 114, 103, 47, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 47, 115, 121, 115, 116, 101, 109, 100, 49, 0, 0, 0, 0, 0, 0, 0, 6, 1, 115, 0, 24, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 115, 121, 115, 116, 101, 109, 100, 49, 0, 0, 0, 0, 0, 0, 0, 0}
+
+// DecodeMainPID decodes a reply from systemd MainPID method.
+func (d *messageDecoder) DecodeMainPID(conn io.Reader) (uint32, error) {
+	d.bufConn.Reset(conn)
+
+	err := decodeMessageHead(d.bufConn, &d.msgh, d.buf)
+	if err != nil {
+		return 0, fmt.Errorf("message head: %w", err)
+	}
+	var offset uint32 = messageHeadSize
+
+	// Read and discarded the message header.
+	if _, err = readN(d.bufConn, d.buf, int(d.msgh.HeaderLen)); err != nil {
+		return 0, fmt.Errorf("message header: %w", err)
+	}
+	offset += d.msgh.HeaderLen
+
+	offset, padding := nextOffset(offset, 8)
+	if _, err = readN(d.bufConn, d.buf, int(padding)); err != nil {
+		return 0, fmt.Errorf("discard header padding: %w", err)
+	}
+
+	body := io.LimitReader(
+		d.bufConn,
+		int64(d.msgh.BodyLen),
+	)
+	d.dec.Reset(body)
+	d.dec.SetOffset(offset)
+	if d.msgh.ByteOrder != littleEndian {
+		d.dec.SetOrder(d.msgh.Order())
+	}
+
+	// Discard known signature "u".
+	if _, err = d.dec.Signature(); err != nil {
+		return 0, err
+	}
+
+	return d.dec.Uint32()
+}
+
+// mainPIDRequest is a hardcoded D-Bus message to request the main PID
+// of dbus.service.
+var mainPIDRequest = []byte{108, 1, 0, 1, 52, 0, 0, 0, 3, 0, 0, 0, 160, 0, 0, 0, 1, 1, 111, 0, 45, 0, 0, 0, 47, 111, 114, 103, 47, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 47, 115, 121, 115, 116, 101, 109, 100, 49, 47, 117, 110, 105, 116, 47, 100, 98, 117, 115, 95, 50, 101, 115, 101, 114, 118, 105, 99, 101, 0, 0, 0, 6, 1, 115, 0, 24, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 115, 121, 115, 116, 101, 109, 100, 49, 0, 0, 0, 0, 0, 0, 0, 0, 3, 1, 115, 0, 3, 0, 0, 0, 71, 101, 116, 0, 0, 0, 0, 0, 2, 1, 115, 0, 31, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 68, 66, 117, 115, 46, 80, 114, 111, 112, 101, 114, 116, 105, 101, 115, 0, 8, 1, 103, 0, 2, 115, 115, 0, 32, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 115, 121, 115, 116, 101, 109, 100, 49, 46, 83, 101, 114, 118, 105, 99, 101, 0, 0, 0, 0, 7, 0, 0, 0, 77, 97, 105, 110, 80, 73, 68, 0}
