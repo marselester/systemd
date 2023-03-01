@@ -3,6 +3,7 @@ package systemd
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"unsafe"
 )
@@ -82,6 +83,10 @@ func decodeMessageHead(conn io.Reader, mh *messageHead, buf *bytes.Buffer) (err 
 	mh.Serial = order.Uint32(b[8:12])
 	mh.HeaderLen = order.Uint32(b[12:])
 
+	if mh.BodyLen > maxMessageSize {
+		return fmt.Errorf("message exceeded the maximum length: %d/%d bytes", mh.BodyLen, maxMessageSize)
+	}
+
 	return nil
 }
 
@@ -135,6 +140,17 @@ func (d *decoder) Align(n uint32) error {
 	return err
 }
 
+// Byte decodes D-Bus BYTE.
+func (d *decoder) Byte() (byte, error) {
+	b, err := readN(d.src, d.buf, 1)
+	if err != nil {
+		return 0, err
+	}
+
+	d.offset++
+	return b[0], nil
+}
+
 // Uint32 decodes D-Bus UINT32.
 func (d *decoder) Uint32() (uint32, error) {
 	err := d.Align(u32size)
@@ -171,6 +187,27 @@ func (d *decoder) String() ([]byte, error) {
 	}
 
 	d.offset += strLen
+	return b[:strLen-1], nil
+}
+
+// Signature decodes D-Bus SIGNATURE
+// which is the same as STRING except the length is a single byte
+// (thus signatures have a maximum length of 255).
+func (d *decoder) Signature() ([]byte, error) {
+	strLen, err := d.Byte()
+	if err != nil {
+		return nil, err
+	}
+	// Account for a null byte at the end of the string.
+	strLen++
+
+	// Read the string content.
+	b, err := readN(d.src, d.buf, int(strLen))
+	if err != nil {
+		return nil, err
+	}
+
+	d.offset += uint32(strLen)
 	return b[:strLen-1], nil
 }
 
