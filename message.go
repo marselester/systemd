@@ -67,33 +67,24 @@ type messageDecoder struct {
 // The pointer to Unit struct in f must not be retained,
 // because its fields change on each f call.
 func (d *messageDecoder) DecodeListUnits(conn io.Reader, f func(*Unit)) error {
+	// Reset the decoder with the buffered connection reader.
 	d.bufConn.Reset(conn)
+	d.dec.Reset(d.bufConn)
 
-	// Read the fixed portion of the message header (16 bytes),
-	// and set the position of the next byte we should be reading from.
-	err := decodeMessageHead(d.bufConn, &d.msgh, d.buf)
-	if err != nil {
-		return fmt.Errorf("message head: %w", err)
-	}
-	var offset uint32 = messageHeadSize
-
-	// Read the message header where the body signature is stored.
+	// Decode the message header (16 bytes).
+	//
+	// Then read the message header where the body signature is stored.
 	// The header usually occupies 61 bytes.
 	// Since we already know the signature from the spec,
 	// the header is discarded.
-	if _, err = readN(d.bufConn, d.buf, int(d.msgh.HeaderLen)); err != nil {
-		return fmt.Errorf("message header: %w", err)
-	}
-	offset += d.msgh.HeaderLen
-
-	// The length of the header must be a multiple of 8,
+	//
+	// Note, the length of the header must be a multiple of 8,
 	// allowing the body to begin on an 8-byte boundary.
 	// If the header does not naturally end on an 8-byte boundary,
 	// up to 7 bytes of alignment padding is added.
-	// Here we're discarding the header padding.
-	offset, padding := nextOffset(offset, 8)
-	if _, err = readN(d.bufConn, d.buf, int(padding)); err != nil {
-		return fmt.Errorf("discard header padding: %w", err)
+	err := decodeMessageHeader(d.dec, &d.msgh)
+	if err != nil {
+		return fmt.Errorf("message head: %w", err)
 	}
 
 	// Read the message body limited by the body length.
@@ -106,10 +97,6 @@ func (d *messageDecoder) DecodeListUnits(conn io.Reader, f func(*Unit)) error {
 		int64(d.msgh.BodyLen),
 	)
 	d.dec.Reset(body)
-	d.dec.SetOffset(offset)
-	if d.msgh.ByteOrder != littleEndian {
-		d.dec.SetOrder(d.msgh.Order())
-	}
 
 	// ListUnits has a body signature "a(ssssssouso)" which is
 	// ARRAY of STRUCT of (STRING, STRING, STRING, STRING, STRING, STRING,
@@ -118,7 +105,7 @@ func (d *messageDecoder) DecodeListUnits(conn io.Reader, f func(*Unit)) error {
 	// Read the body starting from the array length "a" (uint32).
 	// The array length is in bytes, e.g., 35706 bytes.
 	if _, err = d.dec.Uint32(); err != nil {
-		return fmt.Errorf("discard array length: %w", err)
+		return fmt.Errorf("discard unit array length: %w", err)
 	}
 
 	for ; err == nil; err = decodeUnit(d.dec, d.conv, &d.unit) {
@@ -169,25 +156,15 @@ func decodeUnit(d *decoder, conv *stringConverter, unit *Unit) error {
 // listUnitsRequest is a hardcoded D-Bus message to request all systemd units.
 var listUnitsRequest = []byte{108, 1, 0, 1, 0, 0, 0, 0, 2, 0, 0, 0, 145, 0, 0, 0, 3, 1, 115, 0, 9, 0, 0, 0, 76, 105, 115, 116, 85, 110, 105, 116, 115, 0, 0, 0, 0, 0, 0, 0, 2, 1, 115, 0, 32, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 115, 121, 115, 116, 101, 109, 100, 49, 46, 77, 97, 110, 97, 103, 101, 114, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 111, 0, 25, 0, 0, 0, 47, 111, 114, 103, 47, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 47, 115, 121, 115, 116, 101, 109, 100, 49, 0, 0, 0, 0, 0, 0, 0, 6, 1, 115, 0, 24, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 115, 121, 115, 116, 101, 109, 100, 49, 0, 0, 0, 0, 0, 0, 0, 0}
 
-// DecodeMainPID decodes a reply from systemd MainPID method.
+// DecodeMainPID decodes MainPID property reply from systemd
+// org.freedesktop.DBus.Properties.Get method.
 func (d *messageDecoder) DecodeMainPID(conn io.Reader) (uint32, error) {
 	d.bufConn.Reset(conn)
+	d.dec.Reset(d.bufConn)
 
-	err := decodeMessageHead(d.bufConn, &d.msgh, d.buf)
+	err := decodeMessageHeader(d.dec, &d.msgh)
 	if err != nil {
-		return 0, fmt.Errorf("message head: %w", err)
-	}
-	var offset uint32 = messageHeadSize
-
-	// Read and discarded the message header.
-	if _, err = readN(d.bufConn, d.buf, int(d.msgh.HeaderLen)); err != nil {
 		return 0, fmt.Errorf("message header: %w", err)
-	}
-	offset += d.msgh.HeaderLen
-
-	offset, padding := nextOffset(offset, 8)
-	if _, err = readN(d.bufConn, d.buf, int(padding)); err != nil {
-		return 0, fmt.Errorf("discard header padding: %w", err)
 	}
 
 	body := io.LimitReader(
@@ -195,10 +172,6 @@ func (d *messageDecoder) DecodeMainPID(conn io.Reader) (uint32, error) {
 		int64(d.msgh.BodyLen),
 	)
 	d.dec.Reset(body)
-	d.dec.SetOffset(offset)
-	if d.msgh.ByteOrder != littleEndian {
-		d.dec.SetOrder(d.msgh.Order())
-	}
 
 	// Discard known signature "u".
 	if _, err = d.dec.Signature(); err != nil {

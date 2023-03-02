@@ -25,6 +25,21 @@ func TestDecodeMainPID(t *testing.T) {
 	}
 }
 
+func BenchmarkDecodeMainPID(b *testing.B) {
+	conn := bytes.NewReader(mainPIDResponse)
+	msgDec := newMessageDecoder()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		conn.Seek(0, io.SeekStart)
+
+		_, err := msgDec.DecodeMainPID(conn)
+		if err != nil {
+			b.Error(err)
+		}
+	}
+}
+
 // -us:1.38gvs:1.0uG
 var mainPIDResponse = []byte{108, 2, 1, 1, 8, 0, 0, 0, 215, 8, 0, 0, 45, 0, 0, 0, 5, 1, 117, 0, 3, 0, 0, 0, 6, 1, 115, 0, 6, 0, 0, 0, 58, 49, 46, 51, 56, 56, 0, 0, 8, 1, 103, 0, 1, 118, 0, 0, 7, 1, 115, 0, 4, 0, 0, 0, 58, 49, 46, 48, 0, 0, 0, 0, 1, 117, 0, 0, 71, 9, 0, 0}
 

@@ -58,8 +58,7 @@ func (mh *messageHead) Order() binary.ByteOrder {
 	}
 }
 
-// decodeMessageHead reads structured binary data from conn into the message head mh.
-// It always reads msgHeadSize bytes into the buffer buf.
+// decodeMessageHeader reads structured binary data from conn into the message header mh.
 //
 // The signature of the header is "yyyyuua(yv)" which is
 // BYTE, BYTE, BYTE, BYTE, UINT32, UINT32, ARRAY of STRUCT of (BYTE, VARIANT).
@@ -67,24 +66,43 @@ func (mh *messageHead) Order() binary.ByteOrder {
 // where "a" is the length of the header array in bytes.
 // The caller can later decode "(yv)" structs knowing how many bytes to process
 // based on the header length.
-func decodeMessageHead(conn io.Reader, mh *messageHead, buf *bytes.Buffer) (err error) {
-	b, err := readN(conn, buf, messageHeadSize)
+func decodeMessageHeader(dec *decoder, mh *messageHead) error {
+	// Read the fixed portion of the message header (16 bytes),
+	// and set the position of the next byte we should be reading from.
+	b, err := dec.ReadN(messageHeadSize)
 	if err != nil {
 		return err
 	}
 
 	mh.ByteOrder = b[0]
+	order := mh.Order()
+	dec.SetOrder(order)
+
 	mh.Type = b[1]
 	mh.Flags = b[2]
 	mh.Proto = b[3]
-
-	order := mh.Order()
 	mh.BodyLen = order.Uint32(b[4:8])
 	mh.Serial = order.Uint32(b[8:12])
 	mh.HeaderLen = order.Uint32(b[12:])
 
 	if mh.BodyLen > maxMessageSize {
 		return fmt.Errorf("message exceeded the maximum length: %d/%d bytes", mh.BodyLen, maxMessageSize)
+	}
+
+	// Read the header fields where the body signature is stored.
+	// A caller might already know the signature from the spec
+	// and choose not to decode the fields as an optimization.
+	if b, err = dec.ReadN(mh.HeaderLen); err != nil {
+		return fmt.Errorf("message header: %w", err)
+	}
+
+	// The length of the header must be a multiple of 8,
+	// allowing the body to begin on an 8-byte boundary.
+	// If the header does not naturally end on an 8-byte boundary,
+	// up to 7 bytes of alignment padding is added.
+	// Here we're discarding the header padding.
+	if err = dec.Align(8); err != nil {
+		return fmt.Errorf("discard header padding: %w", err)
 	}
 
 	return nil
@@ -106,7 +124,9 @@ type decoder struct {
 	order binary.ByteOrder
 	src   io.Reader
 	buf   *bytes.Buffer
-	// offset is limited by maxMessageSize.
+	// offset is a current position in the message
+	// which is used solely to determine the alignment.
+	// The offset is limited by maxMessageSize.
 	offset uint32
 }
 
@@ -122,12 +142,6 @@ func (d *decoder) SetOrder(order binary.ByteOrder) {
 	d.order = order
 }
 
-// SetOffset sets the tracked offset that is used for alignment.
-// Note, it does not act like a Seek.
-func (d *decoder) SetOffset(offset uint32) {
-	d.offset = offset
-}
-
 // Align advances the decoder by discarding the alignment padding.
 func (d *decoder) Align(n uint32) error {
 	offset, padding := nextOffset(d.offset, n)
@@ -138,6 +152,12 @@ func (d *decoder) Align(n uint32) error {
 	_, err := readN(d.src, d.buf, int(padding))
 	d.offset = offset
 	return err
+}
+
+// ReadN reads exactly n bytes without decoding.
+func (d *decoder) ReadN(n uint32) ([]byte, error) {
+	d.offset += n
+	return readN(d.src, d.buf, int(n))
 }
 
 // Byte decodes D-Bus BYTE.
