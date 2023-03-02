@@ -3,110 +3,9 @@ package systemd
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"io"
 	"unsafe"
 )
-
-const (
-	// maxMessageSize is the maximum length of a message (128 MiB),
-	// including header, header alignment padding, and body.
-	maxMessageSize = 134217728
-	// messageHeadSize is the length of the fixed part of a message header.
-	messageHeadSize = 16
-
-	littleEndian = 'l'
-	bigEndian    = 'B'
-	u32size      = 4
-)
-
-// messageHead represents the part of the message header
-// that has a constant size (16 bytes).
-type messageHead struct {
-	// ByteOrder is an endianness flag;
-	// ASCII 'l' for little-endian or ASCII 'B' for big-endian.
-	// Both header and body are in this endianness.
-	ByteOrder byte
-	// Type is a message type.
-	Type byte
-	// Flags is a bitwise OR of message flags.
-	Flags byte
-	// Proto is a major protocol version of the sending application.
-	Proto byte
-	// BodyLen is a length in bytes of the message body,
-	// starting from the end of the header.
-	// The header ends after its alignment padding to an 8-boundary.
-	BodyLen uint32
-	// Serial is the serial of this message,
-	// used as a cookie by the sender to identify the reply corresponding to this request.
-	// This must not be zero.
-	Serial uint32
-	// HeaderLen is a length of the header array in bytes.
-	// The array contains structs of header fields (code, variant).
-	HeaderLen uint32
-}
-
-// ByteOrder specifies how to convert byte slices into 32-bit unsigned integers.
-func (mh *messageHead) Order() binary.ByteOrder {
-	switch mh.ByteOrder {
-	case littleEndian:
-		return binary.LittleEndian
-	case bigEndian:
-		return binary.BigEndian
-	default:
-		return nil
-	}
-}
-
-// decodeMessageHeader reads structured binary data from conn into the message header mh.
-//
-// The signature of the header is "yyyyuua(yv)" which is
-// BYTE, BYTE, BYTE, BYTE, UINT32, UINT32, ARRAY of STRUCT of (BYTE, VARIANT).
-// Here only the fixed portion "yyyyuua" of the entire header is decoded
-// where "a" is the length of the header array in bytes.
-// The caller can later decode "(yv)" structs knowing how many bytes to process
-// based on the header length.
-func decodeMessageHeader(dec *decoder, mh *messageHead) error {
-	// Read the fixed portion of the message header (16 bytes),
-	// and set the position of the next byte we should be reading from.
-	b, err := dec.ReadN(messageHeadSize)
-	if err != nil {
-		return err
-	}
-
-	mh.ByteOrder = b[0]
-	order := mh.Order()
-	dec.SetOrder(order)
-
-	mh.Type = b[1]
-	mh.Flags = b[2]
-	mh.Proto = b[3]
-	mh.BodyLen = order.Uint32(b[4:8])
-	mh.Serial = order.Uint32(b[8:12])
-	mh.HeaderLen = order.Uint32(b[12:])
-
-	if mh.BodyLen > maxMessageSize {
-		return fmt.Errorf("message exceeded the maximum length: %d/%d bytes", mh.BodyLen, maxMessageSize)
-	}
-
-	// Read the header fields where the body signature is stored.
-	// A caller might already know the signature from the spec
-	// and choose not to decode the fields as an optimization.
-	if b, err = dec.ReadN(mh.HeaderLen); err != nil {
-		return fmt.Errorf("message header: %w", err)
-	}
-
-	// The length of the header must be a multiple of 8,
-	// allowing the body to begin on an 8-byte boundary.
-	// If the header does not naturally end on an 8-byte boundary,
-	// up to 7 bytes of alignment padding is added.
-	// Here we're discarding the header padding.
-	if err = dec.Align(8); err != nil {
-		return fmt.Errorf("discard header padding: %w", err)
-	}
-
-	return nil
-}
 
 // newDecoder creates a new D-Bus decoder.
 // By default it expects the little-endian byte order
@@ -173,6 +72,7 @@ func (d *decoder) Byte() (byte, error) {
 
 // Uint32 decodes D-Bus UINT32.
 func (d *decoder) Uint32() (uint32, error) {
+	const u32size = 4
 	err := d.Align(u32size)
 	if err != nil {
 		return 0, err

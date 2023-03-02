@@ -60,7 +60,7 @@ type messageDecoder struct {
 
 	// The following fields are reused to reduce memory allocs.
 	unit Unit
-	msgh messageHead
+	hdr  header
 }
 
 // DecodeListUnits decodes a reply from systemd ListUnits method.
@@ -82,7 +82,7 @@ func (d *messageDecoder) DecodeListUnits(conn io.Reader, f func(*Unit)) error {
 	// allowing the body to begin on an 8-byte boundary.
 	// If the header does not naturally end on an 8-byte boundary,
 	// up to 7 bytes of alignment padding is added.
-	err := decodeMessageHeader(d.dec, &d.msgh)
+	err := decodeMessageHeader(d.dec, &d.hdr)
 	if err != nil {
 		return fmt.Errorf("message head: %w", err)
 	}
@@ -94,7 +94,7 @@ func (d *messageDecoder) DecodeListUnits(conn io.Reader, f func(*Unit)) error {
 	// i.e., offset 35794 = 16 head + 61 header + 3 padding + 35714 body.
 	body := io.LimitReader(
 		d.bufConn,
-		int64(d.msgh.BodyLen),
+		int64(d.hdr.BodyLen),
 	)
 	d.dec.Reset(body)
 
@@ -162,14 +162,14 @@ func (d *messageDecoder) DecodeMainPID(conn io.Reader) (uint32, error) {
 	d.bufConn.Reset(conn)
 	d.dec.Reset(d.bufConn)
 
-	err := decodeMessageHeader(d.dec, &d.msgh)
+	err := decodeMessageHeader(d.dec, &d.hdr)
 	if err != nil {
 		return 0, fmt.Errorf("message header: %w", err)
 	}
 
 	body := io.LimitReader(
 		d.bufConn,
-		int64(d.msgh.BodyLen),
+		int64(d.hdr.BodyLen),
 	)
 	d.dec.Reset(body)
 
