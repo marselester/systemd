@@ -76,6 +76,8 @@ const (
 )
 
 // decodeHeader decodes a message header from conn into h.
+// The string converter conv helps to reduce allocs when decoding header fields.
+// A caller can ignore the header fields with the skipFields flag.
 //
 // The signature of the header is "yyyyuua(yv)" which is
 // BYTE, BYTE, BYTE, BYTE, UINT32, UINT32, ARRAY of STRUCT of (BYTE, VARIANT).
@@ -83,7 +85,7 @@ const (
 // where "a" is the length of the header array in bytes.
 // The caller can later decode "(yv)" structs knowing how many bytes to process
 // based on the header length.
-func decodeHeader(dec *decoder, h *header) error {
+func decodeHeader(dec *decoder, conv *stringConverter, h *header, skipFields bool) error {
 	// Read the fixed portion of the message header (16 bytes),
 	// and set the position of the next byte we should be reading from.
 	b, err := dec.ReadN(messageHeadSize)
@@ -109,8 +111,26 @@ func decodeHeader(dec *decoder, h *header) error {
 	// Read the header fields where the body signature is stored.
 	// A caller might already know the signature from the spec
 	// and choose not to decode the fields as an optimization.
-	if b, err = dec.ReadN(h.HeaderLen); err != nil {
-		return fmt.Errorf("message header: %w", err)
+	if skipFields {
+		if b, err = dec.ReadN(h.HeaderLen); err != nil {
+			return fmt.Errorf("message header: %w", err)
+		}
+	} else {
+		var (
+			ff        = make(map[byte]headerField)
+			f         headerField
+			hdrArrEnd = dec.offset + h.HeaderLen
+		)
+		for dec.offset < hdrArrEnd {
+			if f, err = decodeHeaderField(dec, conv); err != nil {
+				break
+			}
+
+			ff[f.Code] = f
+		}
+		if len(ff) > 0 {
+			h.Fields = ff
+		}
 	}
 
 	// The length of the header must be a multiple of 8,
