@@ -82,7 +82,7 @@ func (d *messageDecoder) DecodeListUnits(conn io.Reader, f func(*Unit)) error {
 	// allowing the body to begin on an 8-byte boundary.
 	// If the header does not naturally end on an 8-byte boundary,
 	// up to 7 bytes of alignment padding is added.
-	err := decodeMessageHeader(d.dec, &d.hdr)
+	err := decodeHeader(d.dec, &d.hdr)
 	if err != nil {
 		return fmt.Errorf("message head: %w", err)
 	}
@@ -162,7 +162,7 @@ func (d *messageDecoder) DecodeMainPID(conn io.Reader) (uint32, error) {
 	d.bufConn.Reset(conn)
 	d.dec.Reset(d.bufConn)
 
-	err := decodeMessageHeader(d.dec, &d.hdr)
+	err := decodeHeader(d.dec, &d.hdr)
 	if err != nil {
 		return 0, fmt.Errorf("message header: %w", err)
 	}

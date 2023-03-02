@@ -75,7 +75,7 @@ const (
 	maxMessageSize = 134217728
 )
 
-// decodeMessageHeader reads structured binary data from conn into the message header mh.
+// decodeHeader decodes a message header from conn into h.
 //
 // The signature of the header is "yyyyuua(yv)" which is
 // BYTE, BYTE, BYTE, BYTE, UINT32, UINT32, ARRAY of STRUCT of (BYTE, VARIANT).
@@ -83,7 +83,7 @@ const (
 // where "a" is the length of the header array in bytes.
 // The caller can later decode "(yv)" structs knowing how many bytes to process
 // based on the header length.
-func decodeMessageHeader(dec *decoder, h *header) error {
+func decodeHeader(dec *decoder, h *header) error {
 	// Read the fixed portion of the message header (16 bytes),
 	// and set the position of the next byte we should be reading from.
 	b, err := dec.ReadN(messageHeadSize)
