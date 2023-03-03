@@ -199,10 +199,16 @@ const (
 // For example, REPLY_SERIAL code and UINT32 value 3
 // which is the serial number of the message this message is a reply to.
 type headerField struct {
-	// Code is a header field code, see the codes above.
+	// Signature is a signature (single complete type) of the value.
+	Signature string
+	// The following fields contain a header field value
+	// depending on signature.
+	// The decision was made against an interface{} to reduce allocs.
+	U uint64
+	S string
+
+	// Code is a header field code, e.g., fieldPath.
 	Code byte
-	// Value is a header field value.
-	Value interface{}
 }
 
 func (f *headerField) String() string {
@@ -245,14 +251,20 @@ func decodeHeaderField(d *decoder, conv *stringConverter) (f headerField, err er
 		return
 	}
 
-	// Decode v (variant) which is a field value.
+	// Decode "v" (variant) which is a field value.
+	// Variants are marshalled as the SIGNATURE of the contents
+	// (which must be a single complete type),
+	// followed by a marshalled value with the type given by that signature.
 	var sign []byte
 	if sign, err = d.Signature(); err != nil {
 		return
 	}
+	// Container types are not supported yet.
+	// Because there is no need in the scope of this library.
 	if len(sign) != 1 {
-		return f, fmt.Errorf("signature >1: %s", sign)
+		return f, fmt.Errorf("container type is not supported: %s", sign)
 	}
+	f.Signature = conv.String(sign)
 
 	var (
 		u uint32
@@ -264,19 +276,19 @@ func decodeHeaderField(d *decoder, conv *stringConverter) (f headerField, err er
 		if u, err = d.Uint32(); err != nil {
 			return
 		}
-		f.Value = u
+		f.U = uint64(u)
 	// STRING, OBJECT_PATH types.
 	case 's', 'o':
 		if s, err = d.String(); err != nil {
 			return
 		}
-		f.Value = conv.String(s)
+		f.S = conv.String(s)
 	// SIGNATURE type.
 	case 'g':
 		if s, err = d.Signature(); err != nil {
 			return
 		}
-		f.Value = conv.String(s)
+		f.S = conv.String(s)
 	default:
 		return f, fmt.Errorf("unknown type: %s", sign)
 	}

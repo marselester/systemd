@@ -2,7 +2,6 @@ package systemd
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
 	"io"
 	"reflect"
@@ -41,7 +40,6 @@ type Unit struct {
 func newMessageDecoder() *messageDecoder {
 	return &messageDecoder{
 		bufConn: bufio.NewReaderSize(nil, 4096),
-		buf:     &bytes.Buffer{},
 		dec:     newDecoder(nil),
 		// With 4KB buffer, 35867B message takes 25603 B/op, 9 allocs/op.
 		conv: newStringConverter(4096),
@@ -54,7 +52,6 @@ type messageDecoder struct {
 	// thus reducing count of read syscalls (from 4079 to 12 in DecodeListUnits),
 	// but it takes 1% longer for DecodeString, and 3% for DecodeListUnits.
 	bufConn *bufio.Reader
-	buf     *bytes.Buffer
 	dec     *decoder
 	conv    *stringConverter
 
