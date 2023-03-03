@@ -59,7 +59,7 @@ It is recommended to run benchmarks multiple times and check
 how stable they are using [Benchstat](https://pkg.go.dev/golang.org/x/perf/cmd/benchstat) tool.
 
 ```sh
-$ go test -bench=. -benchmem -count=100 . | tee bench-new.txt
+$ go test -timeout 20m -bench=. -benchmem -count=100 . | tee bench-new.txt
 $ benchstat bench-new.txt
 ```
 
@@ -77,16 +77,16 @@ $ benchstat bench-old.txt bench-new.txt
 
 ```
 name               old time/op    new time/op    delta
-DecodeString-2       53.3ns ± 3%    54.1ns ± 2%   +1.48%  (p=0.000 n=100+98)
-DecodeListUnits-2    98.4µs ±15%   102.4µs ±14%   +4.10%  (p=0.000 n=90+96)
+DecodeString-2       54.1ns ± 2%    54.8ns ± 2%  +1.43%  (p=0.000 n=98+98)
+DecodeListUnits-2     102µs ±14%      99µs ± 9%  -3.37%  (p=0.000 n=96+96)
 
 name               old alloc/op   new alloc/op   delta
-DecodeString-2        0.00B          0.00B          ~     (all equal)
-DecodeListUnits-2    25.6kB ± 0%    25.6kB ± 0%   -0.16%  (p=0.000 n=89+100)
+DecodeString-2        0.00B          0.00B         ~     (all equal)
+DecodeListUnits-2    25.6kB ± 0%    25.6kB ± 0%    ~     (all equal)
 
 name               old allocs/op  new allocs/op  delta
-DecodeString-2         0.00           0.00          ~     (all equal)
-DecodeListUnits-2      9.00 ± 0%      7.00 ± 0%  -22.22%  (p=0.000 n=100+100)
+DecodeString-2         0.00           0.00         ~     (all equal)
+DecodeListUnits-2      7.00 ± 0%      7.00 ± 0%    ~     (all equal)
 ```
 
 </details>

@@ -121,3 +121,134 @@ func BenchmarkDecodeHeader(b *testing.B) {
 		}
 	}
 }
+
+func TestEncodeHeader(t *testing.T) {
+	tt := map[string]struct {
+		want []byte
+		h    header
+	}{
+		"pid request": {
+			want: mainPIDRequest,
+			h: header{
+				ByteOrder: littleEndian,
+				Type:      typeMethodCall,
+				Flags:     0,
+				Proto:     1,
+				BodyLen:   52,
+				Serial:    3,
+				FieldsLen: 160,
+				Fields: []headerField{
+					{Signature: "o", S: "/org/freedesktop/systemd1/unit/dbus_2eservice", Code: 1},
+					{Signature: "s", S: "org.freedesktop.systemd1", Code: 6},
+					{Signature: "s", S: "Get", Code: 3},
+					{Signature: "s", S: "org.freedesktop.DBus.Properties", Code: 2},
+					{Signature: "g", S: "ss", Code: 8},
+				},
+			},
+		},
+		"pid response": {
+			want: mainPIDResponse,
+			h: header{
+				ByteOrder: littleEndian,
+				Type:      typeMethodReply,
+				Flags:     1,
+				Proto:     1,
+				BodyLen:   8,
+				Serial:    2263,
+				FieldsLen: 45,
+				Fields: []headerField{
+					{Signature: "u", U: uint64(3), Code: 5},
+					{Signature: "s", S: ":1.388", Code: 6},
+					{Signature: "g", S: "v", Code: 8},
+					{Signature: "s", S: ":1.0", Code: 7},
+				},
+			},
+		},
+		"units request": {
+			want: listUnitsRequest,
+			h: header{
+				ByteOrder: littleEndian,
+				Type:      typeMethodCall,
+				Flags:     0,
+				Proto:     1,
+				BodyLen:   0,
+				Serial:    2,
+				FieldsLen: 145,
+				Fields: []headerField{
+					{Signature: "s", S: "ListUnits", Code: 3},
+					{Signature: "s", S: "org.freedesktop.systemd1.Manager", Code: 2},
+					{Signature: "o", S: "/org/freedesktop/systemd1", Code: 1},
+					{Signature: "s", S: "org.freedesktop.systemd1", Code: 6},
+				},
+			},
+		},
+		"units response": {
+			want: listUnitsResponse,
+			h: header{
+				ByteOrder: littleEndian,
+				Type:      typeMethodReply,
+				Flags:     1,
+				Proto:     1,
+				BodyLen:   35714,
+				Serial:    1758,
+				FieldsLen: 61,
+				Fields: []headerField{
+					{Signature: "u", U: uint64(2), Code: 5},
+					{Signature: "s", S: ":1.308", Code: 6},
+					{Signature: "g", S: "a(ssssssouso)", Code: 8},
+					{Signature: "s", S: ":1.0", Code: 7},
+				},
+			},
+		},
+	}
+
+	for name, tc := range tt {
+		t.Run(name, func(t *testing.T) {
+			dst := bytes.Buffer{}
+			enc := newEncoder(&dst)
+
+			if err := encodeHeader(enc, &tc.h); err != nil {
+				t.Fatal(err)
+			}
+
+			wantHdrLen := tc.h.Len()
+			if int(wantHdrLen) != dst.Len() {
+				t.Errorf("expected header len %d, got %d", wantHdrLen, dst.Len())
+			}
+
+			want := tc.want[:wantHdrLen]
+			if diff := cmp.Diff(want, dst.Bytes()); diff != "" {
+				t.Error(diff, want, dst.Bytes())
+			}
+		})
+	}
+}
+
+func BenchmarkEncodeHeader(b *testing.B) {
+	dst := bytes.Buffer{}
+	enc := newEncoder(&dst)
+	h := header{
+		ByteOrder: littleEndian,
+		Type:      typeMethodReply,
+		Flags:     1,
+		Proto:     1,
+		BodyLen:   8,
+		Serial:    2263,
+		FieldsLen: 45,
+		Fields: []headerField{
+			{Signature: "u", U: uint64(3), Code: 5},
+			{Signature: "s", S: ":1.388", Code: 6},
+			{Signature: "g", S: "v", Code: 8},
+			{Signature: "s", S: ":1.0", Code: 7},
+		},
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		dst.Reset()
+
+		if err := encodeHeader(enc, &h); err != nil {
+			b.Error(err)
+		}
+	}
+}

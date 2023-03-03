@@ -69,6 +69,13 @@ func (h *header) Order() binary.ByteOrder {
 	}
 }
 
+// Len returns the lenght of the message header including padding at the end.
+func (h *header) Len() uint32 {
+	wantHdrLen := messagePrologueSize + h.FieldsLen
+	_, padding := nextOffset(wantHdrLen, 8)
+	return wantHdrLen + padding
+}
+
 const (
 	// messagePrologueSize is the length of the fixed part of a message header,
 	// i.e., from the beginning until the header fields.
@@ -296,4 +303,69 @@ func decodeHeaderField(d *decoder, conv *stringConverter) (f headerField, err er
 	}
 
 	return
+}
+
+// encodeHeader encodes the message header h.
+func encodeHeader(enc *encoder, h *header) error {
+	if h.BodyLen > maxMessageSize {
+		return fmt.Errorf("message exceeded the maximum length: %d/%d bytes", h.BodyLen, maxMessageSize)
+	}
+
+	// Write the fixed portion of the message header (16 bytes).
+	enc.Byte(h.ByteOrder)
+	enc.Byte(h.Type)
+	enc.Byte(h.Flags)
+	enc.Byte(h.Proto)
+	enc.Uint32(h.BodyLen)
+	enc.Uint32(h.Serial)
+	enc.Uint32(h.FieldsLen) // TODO: calculate the length from header fields below.
+
+	// Encode header fields.
+	var err error
+	for _, f := range h.Fields {
+		if err = encodeHeaderField(enc, f); err != nil {
+			return err
+		}
+	}
+
+	// The length of the header must be a multiple of 8,
+	// allowing the body to begin on an 8-byte boundary.
+	enc.Align(8)
+
+	return nil
+}
+
+// encodeHeaderField encodes a header field.
+func encodeHeaderField(e *encoder, f headerField) error {
+	// Container types are not supported yet.
+	// Because there is no need in the scope of this library.
+	if len(f.Signature) != 1 {
+		return fmt.Errorf("container type is not supported: %s", f.Signature)
+	}
+
+	// Since "(yv)" struct is being encoded, a padding should be added.
+	e.Align(8)
+
+	// Encode "y" (a byte) which is a field code.
+	e.Byte(f.Code)
+
+	// Encode v (variant) which is a field value
+	// (signature of the type and value itself).
+	e.Signature([]byte(f.Signature))
+
+	switch f.Signature[0] {
+	// UINT32 type.
+	case 'u':
+		e.Uint32(uint32(f.U))
+	// STRING, OBJECT_PATH types.
+	case 's', 'o':
+		e.String([]byte(f.S))
+	// SIGNATURE type.
+	case 'g':
+		e.Signature([]byte(f.S))
+	default:
+		return fmt.Errorf("unknown type: %s", f.Signature)
+	}
+
+	return nil
 }
