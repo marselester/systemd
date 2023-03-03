@@ -39,9 +39,10 @@ type header struct {
 	// used as a cookie by the sender to identify the reply corresponding to this request.
 	// This must not be zero.
 	Serial uint32
-	// HeaderLen is a length of the header array in bytes.
+	// FieldsLen is a length of the header fields array in bytes
+	// excluding a padding at the end.
 	// The array contains structs of header fields (code, variant).
-	HeaderLen uint32
+	FieldsLen uint32
 
 	// Fields contain header fields if a caller chose to decode them.
 	// A header must contain the required header fields for its message type,
@@ -69,8 +70,9 @@ func (h *header) Order() binary.ByteOrder {
 }
 
 const (
-	// messageHeadSize is the length of the fixed part of a message header.
-	messageHeadSize = 16
+	// messagePrologueSize is the length of the fixed part of a message header,
+	// i.e., from the beginning until the header fields.
+	messagePrologueSize = 16
 	// maxMessageSize is the maximum length of a message (128 MiB),
 	// including header, header alignment padding, and body.
 	maxMessageSize = 134217728
@@ -90,7 +92,7 @@ const (
 func decodeHeader(dec *decoder, conv *stringConverter, h *header, skipFields bool) error {
 	// Read the fixed portion of the message header (16 bytes),
 	// and set the position of the next byte we should be reading from.
-	b, err := dec.ReadN(messageHeadSize)
+	b, err := dec.ReadN(messagePrologueSize)
 	if err != nil {
 		return err
 	}
@@ -104,7 +106,7 @@ func decodeHeader(dec *decoder, conv *stringConverter, h *header, skipFields boo
 	h.Proto = b[3]
 	h.BodyLen = order.Uint32(b[4:8])
 	h.Serial = order.Uint32(b[8:12])
-	h.HeaderLen = order.Uint32(b[12:])
+	h.FieldsLen = order.Uint32(b[12:])
 
 	if h.BodyLen > maxMessageSize {
 		return fmt.Errorf("message exceeded the maximum length: %d/%d bytes", h.BodyLen, maxMessageSize)
@@ -116,13 +118,13 @@ func decodeHeader(dec *decoder, conv *stringConverter, h *header, skipFields boo
 	// A caller might already know the signature from the spec
 	// and choose not to decode the fields as an optimization.
 	if skipFields {
-		if b, err = dec.ReadN(h.HeaderLen); err != nil {
+		if b, err = dec.ReadN(h.FieldsLen); err != nil {
 			return fmt.Errorf("message header: %w", err)
 		}
 	} else {
 		var (
 			f         headerField
-			hdrArrEnd = dec.offset + h.HeaderLen
+			hdrArrEnd = dec.offset + h.FieldsLen
 		)
 		for dec.offset < hdrArrEnd {
 			if f, err = decodeHeaderField(dec, conv); err != nil {

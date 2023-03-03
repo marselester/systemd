@@ -22,7 +22,7 @@ func TestDecodeHeader(t *testing.T) {
 				Proto:     1,
 				BodyLen:   52,
 				Serial:    3,
-				HeaderLen: 160,
+				FieldsLen: 160,
 				Fields: []headerField{
 					{Signature: "o", S: "/org/freedesktop/systemd1/unit/dbus_2eservice", Code: 1},
 					{Signature: "s", S: "org.freedesktop.systemd1", Code: 6},
@@ -41,7 +41,7 @@ func TestDecodeHeader(t *testing.T) {
 				Proto:     1,
 				BodyLen:   8,
 				Serial:    2263,
-				HeaderLen: 45,
+				FieldsLen: 45,
 				Fields: []headerField{
 					{Signature: "u", U: uint64(3), Code: 5},
 					{Signature: "s", S: ":1.388", Code: 6},
@@ -59,7 +59,7 @@ func TestDecodeHeader(t *testing.T) {
 				Proto:     1,
 				BodyLen:   0,
 				Serial:    2,
-				HeaderLen: 145,
+				FieldsLen: 145,
 				Fields: []headerField{
 					{Signature: "s", S: "ListUnits", Code: 3},
 					{Signature: "s", S: "org.freedesktop.systemd1.Manager", Code: 2},
@@ -77,7 +77,7 @@ func TestDecodeHeader(t *testing.T) {
 				Proto:     1,
 				BodyLen:   35714,
 				Serial:    1758,
-				HeaderLen: 61,
+				FieldsLen: 61,
 				Fields: []headerField{
 					{Signature: "u", U: uint64(2), Code: 5},
 					{Signature: "s", S: ":1.308", Code: 6},
