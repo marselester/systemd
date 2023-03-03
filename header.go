@@ -46,7 +46,8 @@ type header struct {
 	// Fields contain header fields if a caller chose to decode them.
 	// A header must contain the required header fields for its message type,
 	// and zero or more of any optional header fields.
-	Fields map[byte]headerField
+	// Note, the order of header fields in the message is preserved.
+	Fields []headerField
 }
 
 const (
@@ -78,6 +79,7 @@ const (
 // decodeHeader decodes a message header from conn into h.
 // The string converter conv helps to reduce allocs when decoding header fields.
 // A caller can ignore the header fields with the skipFields flag.
+// Note, all fields of h must be overwritten because h is reused.
 //
 // The signature of the header is "yyyyuua(yv)" which is
 // BYTE, BYTE, BYTE, BYTE, UINT32, UINT32, ARRAY of STRUCT of (BYTE, VARIANT).
@@ -108,6 +110,8 @@ func decodeHeader(dec *decoder, conv *stringConverter, h *header, skipFields boo
 		return fmt.Errorf("message exceeded the maximum length: %d/%d bytes", h.BodyLen, maxMessageSize)
 	}
 
+	// Clean the fields from a previous header use.
+	h.Fields = h.Fields[:0]
 	// Read the header fields where the body signature is stored.
 	// A caller might already know the signature from the spec
 	// and choose not to decode the fields as an optimization.
@@ -117,7 +121,6 @@ func decodeHeader(dec *decoder, conv *stringConverter, h *header, skipFields boo
 		}
 	} else {
 		var (
-			ff        = make(map[byte]headerField)
 			f         headerField
 			hdrArrEnd = dec.offset + h.HeaderLen
 		)
@@ -126,10 +129,7 @@ func decodeHeader(dec *decoder, conv *stringConverter, h *header, skipFields boo
 				break
 			}
 
-			ff[f.Code] = f
-		}
-		if len(ff) > 0 {
-			h.Fields = ff
+			h.Fields = append(h.Fields, f)
 		}
 	}
 
