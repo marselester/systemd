@@ -30,6 +30,13 @@ type encoder struct {
 	offset uint32
 }
 
+// Reset resets the encoder to be writing into dst
+// starting with zero offset.
+func (e *encoder) Reset(dst *bytes.Buffer) {
+	e.dst = dst
+	e.offset = 0
+}
+
 // Offset returns a current position in the encoded message.
 func (e *encoder) Offset() uint32 {
 	return e.offset

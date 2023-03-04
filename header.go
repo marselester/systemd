@@ -7,16 +7,16 @@ import (
 
 // Message types that can appear in the second byte of the header.
 const (
-	// typeMethodCall is a method call.
+	// msgTypeMethodCall is a method call.
 	// This message type may prompt a reply.
-	typeMethodCall byte = 1 + iota
-	// typeMethodReply is a method reply with returned data.
-	typeMethodReply
-	// typeError is an error reply.
+	msgTypeMethodCall byte = 1 + iota
+	// msgTypeMethodReply is a method reply with returned data.
+	msgTypeMethodReply
+	// msgTypeError is an error reply.
 	// If the first argument exists and is a string, it is an error message.
-	typeError
-	// typeSignal is a signal emission.
-	typeSignal
+	msgTypeError
+	// msgTypeSignal is a signal emission.
+	msgTypeSignal
 )
 
 // header represents a message header.
@@ -71,18 +71,18 @@ func (h *header) Order() binary.ByteOrder {
 
 // Len returns the lenght of the message header including padding at the end.
 func (h *header) Len() uint32 {
-	wantHdrLen := messagePrologueSize + h.FieldsLen
+	wantHdrLen := msgPrologueSize + h.FieldsLen
 	_, padding := nextOffset(wantHdrLen, 8)
 	return wantHdrLen + padding
 }
 
 const (
-	// messagePrologueSize is the length of the fixed part of a message header,
+	// msgPrologueSize is the length of the fixed part of a message header,
 	// i.e., from the beginning until the header fields.
-	messagePrologueSize = 16
-	// maxMessageSize is the maximum length of a message (128 MiB),
+	msgPrologueSize = 16
+	// maxMsgSize is the maximum length of a message (128 MiB),
 	// including header, header alignment padding, and body.
-	maxMessageSize = 134217728
+	maxMsgSize = 134217728
 )
 
 // decodeHeader decodes a message header from conn into h.
@@ -99,7 +99,7 @@ const (
 func decodeHeader(dec *decoder, conv *stringConverter, h *header, skipFields bool) error {
 	// Read the fixed portion of the message header (16 bytes),
 	// and set the position of the next byte we should be reading from.
-	b, err := dec.ReadN(messagePrologueSize)
+	b, err := dec.ReadN(msgPrologueSize)
 	if err != nil {
 		return err
 	}
@@ -115,8 +115,8 @@ func decodeHeader(dec *decoder, conv *stringConverter, h *header, skipFields boo
 	h.Serial = order.Uint32(b[8:12])
 	h.FieldsLen = order.Uint32(b[12:])
 
-	if h.BodyLen > maxMessageSize {
-		return fmt.Errorf("message exceeded the maximum length: %d/%d bytes", h.BodyLen, maxMessageSize)
+	if h.BodyLen > maxMsgSize {
+		return fmt.Errorf("message exceeded the maximum length: %d/%d bytes", h.BodyLen, maxMsgSize)
 	}
 
 	// Clean the fields from a previous header use.
@@ -306,9 +306,10 @@ func decodeHeaderField(d *decoder, conv *stringConverter) (f headerField, err er
 }
 
 // encodeHeader encodes the message header h.
+// FieldsLen can be arbitrary, because it will be overwritten.
 func encodeHeader(enc *encoder, h *header) error {
-	if h.BodyLen > maxMessageSize {
-		return fmt.Errorf("message exceeded the maximum length: %d/%d bytes", h.BodyLen, maxMessageSize)
+	if h.BodyLen > maxMsgSize {
+		return fmt.Errorf("message exceeded the maximum length: %d/%d bytes", h.BodyLen, maxMsgSize)
 	}
 
 	// Write the fixed portion of the message header (16 bytes).
