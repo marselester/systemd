@@ -10,6 +10,35 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+func TestEncodeMainPID(t *testing.T) {
+	msgEnc := newMessageEncoder()
+	conn := &bytes.Buffer{}
+	err := msgEnc.EncodeMainPID(conn, "dbus_2eservice")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := conn.Bytes()
+	if diff := cmp.Diff(mainPIDRequest, got); diff != "" {
+		t.Error(diff)
+	}
+}
+
+func BenchmarkEncodeMainPID(b *testing.B) {
+	msgEnc := newMessageEncoder()
+	conn := &bytes.Buffer{}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		conn.Reset()
+
+		err := msgEnc.EncodeMainPID(conn, "dbus_2eservice")
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 func TestDecodeMainPID(t *testing.T) {
 	conn := bytes.NewReader(mainPIDResponse)
 	msgDec := newMessageDecoder()

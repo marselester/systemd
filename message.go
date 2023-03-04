@@ -2,6 +2,7 @@ package systemd
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"reflect"
@@ -81,7 +82,7 @@ func (d *messageDecoder) DecodeListUnits(conn io.Reader, f func(*Unit)) error {
 	// up to 7 bytes of alignment padding is added.
 	err := decodeHeader(d.dec, d.conv, &d.hdr, true)
 	if err != nil {
-		return fmt.Errorf("message head: %w", err)
+		return fmt.Errorf("message header: %w", err)
 	}
 
 	// Read the message body limited by the body length.
@@ -109,7 +110,7 @@ func (d *messageDecoder) DecodeListUnits(conn io.Reader, f func(*Unit)) error {
 		f(&d.unit)
 	}
 	if err != io.EOF {
-		return err
+		return fmt.Errorf("message body: %w", err)
 	}
 
 	return nil
@@ -181,3 +182,62 @@ func (d *messageDecoder) DecodeMainPID(conn io.Reader) (uint32, error) {
 // mainPIDRequest is a hardcoded D-Bus message to request the main PID
 // of dbus.service.
 var mainPIDRequest = []byte{108, 1, 0, 1, 52, 0, 0, 0, 3, 0, 0, 0, 160, 0, 0, 0, 1, 1, 111, 0, 45, 0, 0, 0, 47, 111, 114, 103, 47, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 47, 115, 121, 115, 116, 101, 109, 100, 49, 47, 117, 110, 105, 116, 47, 100, 98, 117, 115, 95, 50, 101, 115, 101, 114, 118, 105, 99, 101, 0, 0, 0, 6, 1, 115, 0, 24, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 115, 121, 115, 116, 101, 109, 100, 49, 0, 0, 0, 0, 0, 0, 0, 0, 3, 1, 115, 0, 3, 0, 0, 0, 71, 101, 116, 0, 0, 0, 0, 0, 2, 1, 115, 0, 31, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 68, 66, 117, 115, 46, 80, 114, 111, 112, 101, 114, 116, 105, 101, 115, 0, 8, 1, 103, 0, 2, 115, 115, 0, 32, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 115, 121, 115, 116, 101, 109, 100, 49, 46, 83, 101, 114, 118, 105, 99, 101, 0, 0, 0, 0, 7, 0, 0, 0, 77, 97, 105, 110, 80, 73, 68, 0}
+
+func newMessageEncoder() *messageEncoder {
+	return &messageEncoder{
+		buf: &bytes.Buffer{},
+		enc: newEncoder(nil),
+	}
+}
+
+// messageEncoder is responsible for encoding and sending messages to dbus.
+type messageEncoder struct {
+	buf *bytes.Buffer
+	enc *encoder
+}
+
+// EncodeMainPID encodes MainPID property request.
+func (e *messageEncoder) EncodeMainPID(conn io.Writer, unitName string) error {
+	e.buf.Reset()
+	e.enc.Reset(e.buf)
+
+	h := header{
+		ByteOrder: littleEndian,
+		Type:      msgTypeMethodCall,
+		Proto:     1,
+		Serial:    3,
+		Fields: []headerField{
+			{Signature: "o", S: "/org/freedesktop/systemd1/unit/dbus_2eservice", Code: fieldPath},
+			{Signature: "s", S: "org.freedesktop.systemd1", Code: fieldDestination},
+			{Signature: "s", S: "Get", Code: fieldMember},
+			{Signature: "s", S: "org.freedesktop.DBus.Properties", Code: fieldInterface},
+			{Signature: "g", S: "ss", Code: fieldSignature},
+		},
+	}
+	err := encodeHeader(e.enc, &h)
+	if err != nil {
+		return fmt.Errorf("message header: %w", err)
+	}
+
+	// Encode message body with a known signature "ss".
+	const (
+		iface    = "org.freedesktop.systemd1.Service"
+		propName = "MainPID"
+	)
+	bodyOffset := e.enc.Offset()
+	e.enc.String(iface)
+	e.enc.String(propName)
+
+	// Overwrite the h.BodyLen with an actual length of the message body.
+	const headerBodyLenOffset = 4
+	bodyLen := e.enc.Offset() - bodyOffset
+	if err = e.enc.Uint32At(bodyLen, headerBodyLenOffset); err != nil {
+		return fmt.Errorf("encode header BodyLen: %w", err)
+	}
+
+	if _, err = conn.Write(e.buf.Bytes()); err != nil {
+		return fmt.Errorf("message body: %w", err)
+	}
+
+	return nil
+}
