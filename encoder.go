@@ -3,6 +3,7 @@ package systemd
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 )
 
 // newEncoder creates a new D-Bus encoder.
@@ -29,6 +30,11 @@ type encoder struct {
 	offset uint32
 }
 
+// Offset returns a current position in the encoded message.
+func (e *encoder) Offset() uint32 {
+	return e.offset
+}
+
 // Align adds the alignment padding.
 func (e *encoder) Align(n uint32) {
 	offset, padding := nextOffset(e.offset, n)
@@ -48,7 +54,6 @@ func (e *encoder) Byte(b byte) {
 
 // Uint32 encodes D-Bus UINT32.
 func (e *encoder) Uint32(u uint32) {
-	const u32size = 4
 	e.Align(u32size)
 
 	b := e.buf[:u32size]
@@ -56,6 +61,24 @@ func (e *encoder) Uint32(u uint32) {
 	e.dst.Write(b)
 	// 4 bytes were written because uint32 takes 4 bytes.
 	e.offset += u32size
+}
+
+// Uint32At encodes UINT32 at the given offset.
+// This is usefull when overwriting a header field such as FieldsLen
+// because it is not known in advance.
+func (e *encoder) Uint32At(u, offset uint32) error {
+	if offset < 0 || int(offset) >= e.dst.Len() {
+		return fmt.Errorf("offset is out of range: %d/%d", offset, e.dst.Len())
+	}
+
+	b := e.buf[:u32size]
+	e.order.PutUint32(b, u)
+
+	// Overwrite 4 bytes of encoded uint32 in the dst
+	// starting from the offset.
+	dst := e.dst.Bytes()
+	copy(dst[offset:], b)
+	return nil
 }
 
 // String encodes D-Bus STRING or OBJECT_PATH.

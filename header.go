@@ -318,14 +318,26 @@ func encodeHeader(enc *encoder, h *header) error {
 	enc.Byte(h.Proto)
 	enc.Uint32(h.BodyLen)
 	enc.Uint32(h.Serial)
-	enc.Uint32(h.FieldsLen) // TODO: calculate the length from header fields below.
+	// The length of the header fields array
+	// gets overwritten after the array is encoded.
+	const headerFieldsLenOffset = 12
+	enc.Uint32(h.FieldsLen)
 
 	// Encode header fields.
-	var err error
-	for _, f := range h.Fields {
+	var (
+		err          error
+		f            headerField
+		fieldsOffset = enc.Offset()
+	)
+	for _, f = range h.Fields {
 		if err = encodeHeaderField(enc, f); err != nil {
 			return err
 		}
+	}
+	// Overwrite the h.FieldsLen with an actual length of fields array.
+	fieldsLen := enc.Offset() - fieldsOffset
+	if err = enc.Uint32At(fieldsLen, headerFieldsLenOffset); err != nil {
+		return fmt.Errorf("encode header FieldsLen: %w", err)
 	}
 
 	// The length of the header must be a multiple of 8,

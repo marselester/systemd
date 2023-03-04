@@ -70,9 +70,10 @@ func (d *decoder) Byte() (byte, error) {
 	return b[0], nil
 }
 
+const u32size = 4
+
 // Uint32 decodes D-Bus UINT32.
 func (d *decoder) Uint32() (uint32, error) {
-	const u32size = 4
 	err := d.Align(u32size)
 	if err != nil {
 		return 0, err
