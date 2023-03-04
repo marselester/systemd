@@ -351,7 +351,7 @@ func encodeHeaderField(e *encoder, f headerField) error {
 
 	// Encode v (variant) which is a field value
 	// (signature of the type and value itself).
-	e.Signature([]byte(f.Signature))
+	e.Signature(f.Signature)
 
 	switch f.Signature[0] {
 	// UINT32 type.
@@ -359,10 +359,10 @@ func encodeHeaderField(e *encoder, f headerField) error {
 		e.Uint32(uint32(f.U))
 	// STRING, OBJECT_PATH types.
 	case 's', 'o':
-		e.String([]byte(f.S))
+		e.String(f.S)
 	// SIGNATURE type.
 	case 'g':
-		e.Signature([]byte(f.S))
+		e.Signature(f.S)
 	default:
 		return fmt.Errorf("unknown type: %s", f.Signature)
 	}

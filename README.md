@@ -77,16 +77,25 @@ $ benchstat bench-old.txt bench-new.txt
 
 ```
 name               old time/op    new time/op    delta
-DecodeString-2       54.1ns ± 2%    54.8ns ± 2%  +1.43%  (p=0.000 n=98+98)
-DecodeListUnits-2     102µs ±14%      99µs ± 9%  -3.37%  (p=0.000 n=96+96)
+DecodeString-2       54.8ns ± 2%    54.7ns ± 2%    -0.35%  (p=0.006 n=98+99)
+DecodeHeader-2        345ns ± 8%     341ns ± 7%    -0.96%  (p=0.010 n=95+95)
+EncodeHeader-2        305ns ± 2%     177ns ± 2%   -41.91%  (p=0.000 n=96+99)
+DecodeMainPID-2       159ns ± 6%     160ns ± 8%      ~     (p=0.095 n=93+98)
+DecodeListUnits-2    99.0µs ± 9%    97.9µs ± 8%    -1.05%  (p=0.039 n=96+94)
 
 name               old alloc/op   new alloc/op   delta
-DecodeString-2        0.00B          0.00B         ~     (all equal)
-DecodeListUnits-2    25.6kB ± 0%    25.6kB ± 0%    ~     (all equal)
+DecodeString-2        0.00B          0.00B           ~     (all equal)
+DecodeHeader-2        15.0B ± 0%     15.0B ± 0%      ~     (all equal)
+EncodeHeader-2        32.0B ± 0%      0.0B       -100.00%  (p=0.000 n=100+100)
+DecodeMainPID-2       24.0B ± 0%     24.0B ± 0%      ~     (all equal)
+DecodeListUnits-2    25.6kB ± 0%    25.6kB ± 0%      ~     (all equal)
 
 name               old allocs/op  new allocs/op  delta
-DecodeString-2         0.00           0.00         ~     (all equal)
-DecodeListUnits-2      7.00 ± 0%      7.00 ± 0%    ~     (all equal)
+DecodeString-2         0.00           0.00           ~     (all equal)
+DecodeHeader-2         0.00           0.00           ~     (all equal)
+EncodeHeader-2         9.00 ± 0%      0.00       -100.00%  (p=0.000 n=100+100)
+DecodeMainPID-2        1.00 ± 0%      1.00 ± 0%      ~     (all equal)
+DecodeListUnits-2      7.00 ± 0%      7.00 ± 0%      ~     (all equal)
 ```
 
 </details>
