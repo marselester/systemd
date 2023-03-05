@@ -13,7 +13,7 @@ import (
 func TestEncodeMainPID(t *testing.T) {
 	msgEnc := newMessageEncoder()
 	conn := &bytes.Buffer{}
-	err := msgEnc.EncodeMainPID(conn, "dbus_2eservice")
+	err := msgEnc.EncodeMainPID(conn, "dbus.service")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +32,7 @@ func BenchmarkEncodeMainPID(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		conn.Reset()
 
-		err := msgEnc.EncodeMainPID(conn, "dbus_2eservice")
+		err := msgEnc.EncodeMainPID(conn, "dbus.service")
 		if err != nil {
 			b.Fatal(err)
 		}

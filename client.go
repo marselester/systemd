@@ -55,6 +55,7 @@ func New(conn *net.UnixConn) (*Client, error) {
 	c := Client{
 		conn:   conn,
 		msgDec: newMessageDecoder(),
+		msgEnc: newMessageEncoder(),
 	}
 	return &c, nil
 }
@@ -64,6 +65,7 @@ func New(conn *net.UnixConn) (*Client, error) {
 type Client struct {
 	conn   *net.UnixConn
 	msgDec *messageDecoder
+	msgEnc *messageEncoder
 
 	// According to https://dbus.freedesktop.org/doc/dbus-specification.html
 	// D-Bus connection receives messages serially.
@@ -112,7 +114,7 @@ func (c *Client) MainPID(service string) (uint32, error) {
 	// org.freedesktop.DBus.Properties.Get method
 	// to retrieve MainPID property from
 	// org.freedesktop.systemd1.Service interface.
-	_, err := c.conn.Write(mainPIDRequest)
+	err := c.msgEnc.EncodeMainPID(c.conn, service)
 	if err != nil {
 		return 0, err
 	}

@@ -42,7 +42,7 @@ func newMessageDecoder() *messageDecoder {
 	return &messageDecoder{
 		bufConn: bufio.NewReaderSize(nil, 4096),
 		dec:     newDecoder(nil),
-		// With 4KB buffer, 35867B message takes 25603 B/op, 9 allocs/op.
+		// With 4KB buffer, 35867B message takes 25563 B/op, 7 allocs/op.
 		conv: newStringConverter(4096),
 	}
 }
@@ -185,19 +185,31 @@ var mainPIDRequest = []byte{108, 1, 0, 1, 52, 0, 0, 0, 3, 0, 0, 0, 160, 0, 0, 0,
 
 func newMessageEncoder() *messageEncoder {
 	return &messageEncoder{
-		buf: &bytes.Buffer{},
-		enc: newEncoder(nil),
+		buf:  &bytes.Buffer{},
+		enc:  newEncoder(nil),
+		conv: newStringConverter(4096),
 	}
 }
 
 // messageEncoder is responsible for encoding and sending messages to dbus.
 type messageEncoder struct {
-	buf *bytes.Buffer
-	enc *encoder
+	// buf is a buffer where an encoder writes the message.
+	buf  *bytes.Buffer
+	enc  *encoder
+	conv *stringConverter
 }
 
-// EncodeMainPID encodes MainPID property request.
+// EncodeMainPID encodes MainPID property request for the given unit name,
+// e.g., "dbus.service".
 func (e *messageEncoder) EncodeMainPID(conn io.Writer, unitName string) error {
+	// Escape an object path to send a call to,
+	// e.g., /org/freedesktop/systemd1/unit/dbus_2eservice.
+	e.buf.Reset()
+	e.buf.WriteString("/org/freedesktop/systemd1/unit/")
+	escapeBusLabel(unitName, e.buf)
+	objPath := e.conv.String(e.buf.Bytes())
+
+	// Reset the encoder to encode the header and the body.
 	e.buf.Reset()
 	e.enc.Reset(e.buf)
 
@@ -207,7 +219,7 @@ func (e *messageEncoder) EncodeMainPID(conn io.Writer, unitName string) error {
 		Proto:     1,
 		Serial:    3,
 		Fields: []headerField{
-			{Signature: "o", S: "/org/freedesktop/systemd1/unit/dbus_2eservice", Code: fieldPath},
+			{Signature: "o", S: objPath, Code: fieldPath},
 			{Signature: "s", S: "org.freedesktop.systemd1", Code: fieldDestination},
 			{Signature: "s", S: "Get", Code: fieldMember},
 			{Signature: "s", S: "org.freedesktop.DBus.Properties", Code: fieldInterface},

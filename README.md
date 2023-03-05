@@ -7,6 +7,8 @@
 
 This package provides an access to systemd via D-Bus
 to list services with a low overhead for a caller.
+If you find the API too limiting or missing some of functionality,
+perhaps https://github.com/coreos/go-systemd might suit you better.
 
 ```go
 conn, err := systemd.Dial()

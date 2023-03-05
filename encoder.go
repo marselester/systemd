@@ -3,6 +3,7 @@ package systemd
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 )
 
@@ -110,4 +111,48 @@ func (e *encoder) Signature(s string) {
 	// Account for a null byte at the end of the string.
 	e.dst.WriteByte(0)
 	e.offset += uint32(strLen + 1)
+}
+
+// escapeBusLabel escapes a bus label such as a unit name.
+// Given a string s, all characters which are not ASCII alphanumerics
+// are replaced by C-style "\x2d" escapes.
+// If the first character is a numeric, it's also escaped.
+//
+// See https://github.com/systemd/systemd/blob/main/src/basic/bus-label.c.
+func escapeBusLabel(s string, buf *bytes.Buffer) {
+	if len(s) == 0 {
+		buf.WriteRune('_')
+		return
+	}
+
+	// First two bytes are for the char hex,
+	// and the third byte is an ASCII char to encode.
+	b := [3]byte{}
+	dst := b[:2]
+	src := b[2:]
+
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if shouldEscape(i, c) {
+			b[2] = c
+			hex.Encode(dst, src)
+			buf.WriteByte('_')
+			buf.Write(dst)
+		} else {
+			buf.WriteByte(c)
+		}
+	}
+}
+
+func shouldEscape(i int, c byte) bool {
+	switch {
+	case i > 0 && '0' <= c && c <= '9':
+		return false
+	case 'A' <= c && c <= 'Z':
+		return false
+	case 'a' <= c && c <= 'z':
+		return false
+	default:
+		return true
+	}
 }
