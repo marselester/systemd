@@ -151,9 +151,6 @@ func decodeUnit(d *decoder, conv *stringConverter, unit *Unit) error {
 	return nil
 }
 
-// listUnitsRequest is a hardcoded D-Bus message to request all systemd units.
-var listUnitsRequest = []byte{108, 1, 0, 1, 0, 0, 0, 0, 2, 0, 0, 0, 145, 0, 0, 0, 3, 1, 115, 0, 9, 0, 0, 0, 76, 105, 115, 116, 85, 110, 105, 116, 115, 0, 0, 0, 0, 0, 0, 0, 2, 1, 115, 0, 32, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 115, 121, 115, 116, 101, 109, 100, 49, 46, 77, 97, 110, 97, 103, 101, 114, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 111, 0, 25, 0, 0, 0, 47, 111, 114, 103, 47, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 47, 115, 121, 115, 116, 101, 109, 100, 49, 0, 0, 0, 0, 0, 0, 0, 6, 1, 115, 0, 24, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 115, 121, 115, 116, 101, 109, 100, 49, 0, 0, 0, 0, 0, 0, 0, 0}
-
 // DecodeMainPID decodes MainPID property reply from systemd
 // org.freedesktop.DBus.Properties.Get method.
 func (d *messageDecoder) DecodeMainPID(conn io.Reader) (uint32, error) {
@@ -179,10 +176,6 @@ func (d *messageDecoder) DecodeMainPID(conn io.Reader) (uint32, error) {
 	return d.dec.Uint32()
 }
 
-// mainPIDRequest is a hardcoded D-Bus message to request the main PID
-// of dbus.service.
-var mainPIDRequest = []byte{108, 1, 0, 1, 52, 0, 0, 0, 3, 0, 0, 0, 160, 0, 0, 0, 1, 1, 111, 0, 45, 0, 0, 0, 47, 111, 114, 103, 47, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 47, 115, 121, 115, 116, 101, 109, 100, 49, 47, 117, 110, 105, 116, 47, 100, 98, 117, 115, 95, 50, 101, 115, 101, 114, 118, 105, 99, 101, 0, 0, 0, 6, 1, 115, 0, 24, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 115, 121, 115, 116, 101, 109, 100, 49, 0, 0, 0, 0, 0, 0, 0, 0, 3, 1, 115, 0, 3, 0, 0, 0, 71, 101, 116, 0, 0, 0, 0, 0, 2, 1, 115, 0, 31, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 68, 66, 117, 115, 46, 80, 114, 111, 112, 101, 114, 116, 105, 101, 115, 0, 8, 1, 103, 0, 2, 115, 115, 0, 32, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 115, 121, 115, 116, 101, 109, 100, 49, 46, 83, 101, 114, 118, 105, 99, 101, 0, 0, 0, 0, 7, 0, 0, 0, 77, 97, 105, 110, 80, 73, 68, 0}
-
 func newMessageEncoder() *messageEncoder {
 	return &messageEncoder{
 		buf:  &bytes.Buffer{},
@@ -197,6 +190,36 @@ type messageEncoder struct {
 	buf  *bytes.Buffer
 	enc  *encoder
 	conv *stringConverter
+}
+
+// EncodeListUnits encodes a request to systemd ListUnits method.
+func (e *messageEncoder) EncodeListUnits(conn io.Writer) error {
+	// Reset the encoder to encode the header.
+	e.buf.Reset()
+	e.enc.Reset(e.buf)
+
+	h := header{
+		ByteOrder: littleEndian,
+		Type:      msgTypeMethodCall,
+		Proto:     1,
+		Serial:    2,
+		Fields: []headerField{
+			{Signature: "s", S: "ListUnits", Code: fieldMember},
+			{Signature: "s", S: "org.freedesktop.systemd1.Manager", Code: fieldInterface},
+			{Signature: "o", S: "/org/freedesktop/systemd1", Code: fieldPath},
+			{Signature: "s", S: "org.freedesktop.systemd1", Code: fieldDestination},
+		},
+	}
+	err := encodeHeader(e.enc, &h)
+	if err != nil {
+		return fmt.Errorf("message header: %w", err)
+	}
+
+	if _, err = conn.Write(e.buf.Bytes()); err != nil {
+		return fmt.Errorf("write message: %w", err)
+	}
+
+	return nil
 }
 
 // EncodeMainPID encodes MainPID property request for the given unit name,
@@ -248,7 +271,7 @@ func (e *messageEncoder) EncodeMainPID(conn io.Writer, unitName string) error {
 	}
 
 	if _, err = conn.Write(e.buf.Bytes()); err != nil {
-		return fmt.Errorf("message body: %w", err)
+		return fmt.Errorf("write message: %w", err)
 	}
 
 	return nil

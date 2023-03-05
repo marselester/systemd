@@ -10,6 +10,35 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+func TestEncodeListUnits(t *testing.T) {
+	msgEnc := newMessageEncoder()
+	conn := &bytes.Buffer{}
+	err := msgEnc.EncodeListUnits(conn)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := conn.Bytes()
+	if diff := cmp.Diff(listUnitsRequest, got); diff != "" {
+		t.Error(diff)
+	}
+}
+
+func BenchmarkEncodeListUnits(b *testing.B) {
+	msgEnc := newMessageEncoder()
+	conn := &bytes.Buffer{}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		conn.Reset()
+
+		err := msgEnc.EncodeListUnits(conn)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 func TestEncodeMainPID(t *testing.T) {
 	msgEnc := newMessageEncoder()
 	conn := &bytes.Buffer{}
@@ -68,6 +97,9 @@ func BenchmarkDecodeMainPID(b *testing.B) {
 		}
 	}
 }
+
+// mainPIDRequest is a D-Bus message to request the main PID of "dbus.service".
+var mainPIDRequest = []byte{108, 1, 0, 1, 52, 0, 0, 0, 3, 0, 0, 0, 160, 0, 0, 0, 1, 1, 111, 0, 45, 0, 0, 0, 47, 111, 114, 103, 47, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 47, 115, 121, 115, 116, 101, 109, 100, 49, 47, 117, 110, 105, 116, 47, 100, 98, 117, 115, 95, 50, 101, 115, 101, 114, 118, 105, 99, 101, 0, 0, 0, 6, 1, 115, 0, 24, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 115, 121, 115, 116, 101, 109, 100, 49, 0, 0, 0, 0, 0, 0, 0, 0, 3, 1, 115, 0, 3, 0, 0, 0, 71, 101, 116, 0, 0, 0, 0, 0, 2, 1, 115, 0, 31, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 68, 66, 117, 115, 46, 80, 114, 111, 112, 101, 114, 116, 105, 101, 115, 0, 8, 1, 103, 0, 2, 115, 115, 0, 32, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 115, 121, 115, 116, 101, 109, 100, 49, 46, 83, 101, 114, 118, 105, 99, 101, 0, 0, 0, 0, 7, 0, 0, 0, 77, 97, 105, 110, 80, 73, 68, 0}
 
 // -us:1.38gvs:1.0uG
 var mainPIDResponse = []byte{108, 2, 1, 1, 8, 0, 0, 0, 215, 8, 0, 0, 45, 0, 0, 0, 5, 1, 117, 0, 3, 0, 0, 0, 6, 1, 115, 0, 6, 0, 0, 0, 58, 49, 46, 51, 56, 56, 0, 0, 8, 1, 103, 0, 1, 118, 0, 0, 7, 1, 115, 0, 4, 0, 0, 0, 58, 49, 46, 48, 0, 0, 0, 0, 1, 117, 0, 0, 71, 9, 0, 0}
@@ -190,6 +222,9 @@ var expectedServices = []Unit{
 		JobPath:     "/",
 	},
 }
+
+// listUnitsRequest is a D-Bus message to request all systemd units.
+var listUnitsRequest = []byte{108, 1, 0, 1, 0, 0, 0, 0, 2, 0, 0, 0, 145, 0, 0, 0, 3, 1, 115, 0, 9, 0, 0, 0, 76, 105, 115, 116, 85, 110, 105, 116, 115, 0, 0, 0, 0, 0, 0, 0, 2, 1, 115, 0, 32, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 115, 121, 115, 116, 101, 109, 100, 49, 46, 77, 97, 110, 97, 103, 101, 114, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 111, 0, 25, 0, 0, 0, 47, 111, 114, 103, 47, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 47, 115, 121, 115, 116, 101, 109, 100, 49, 0, 0, 0, 0, 0, 0, 0, 6, 1, 115, 0, 24, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 115, 121, 115, 116, 101, 109, 100, 49, 0, 0, 0, 0, 0, 0, 0, 0}
 
 // listUnitsResponse is D-Bus message (35867 bytes)
 // that contains 157 Unit structs.

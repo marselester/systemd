@@ -81,6 +81,13 @@ type Client struct {
 	msgSerial uint32
 }
 
+// ListUnits fetches systemd units and calls f.
+// The pointer to Unit struct in f must not be retained,
+// because its fields change on each f call.
+//
+// Note, don't call any Client's methods within f,
+// because concurrent reading from the same underlying connection
+// is not supported.
 func (c *Client) ListUnits(f func(*Unit)) error {
 	if !c.mu.TryLock() {
 		return fmt.Errorf("must be called serially")
@@ -90,7 +97,7 @@ func (c *Client) ListUnits(f func(*Unit)) error {
 	// Send a dbus message that calls
 	// org.freedesktop.systemd1.Manager.ListUnits method
 	// to get an array of all currently loaded systemd units.
-	_, err := c.conn.Write(listUnitsRequest)
+	err := c.msgEnc.EncodeListUnits(c.conn)
 	if err != nil {
 		return err
 	}
@@ -98,7 +105,7 @@ func (c *Client) ListUnits(f func(*Unit)) error {
 	return c.msgDec.DecodeListUnits(c.conn, f)
 }
 
-// MainPID returns the main PID of the service or 0 if there was an error.
+// MainPID fetches the main PID of the service or 0 if there was an error.
 //
 // Note, you can't call this method within ListUnits's f func,
 // because that would imply concurrent reading from the same underlying connection.
