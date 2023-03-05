@@ -78,7 +78,19 @@ type Client struct {
 	mu sync.Mutex
 	// The serial of this message,
 	// used as a cookie by the sender to identify the reply corresponding to this request.
+	// This must not be zero.
 	msgSerial uint32
+}
+
+// nextMsgSerial returns the next message number.
+// It resets the serial to 1 after overflowing.
+func (c *Client) nextMsgSerial() uint32 {
+	c.msgSerial++
+	// Start over when the serial overflows 4,294,967,295.
+	if c.msgSerial == 0 {
+		c.msgSerial++
+	}
+	return c.msgSerial
 }
 
 // ListUnits fetches systemd units and calls f.
@@ -94,10 +106,11 @@ func (c *Client) ListUnits(f func(*Unit)) error {
 	}
 	defer c.mu.Unlock()
 
+	serial := c.nextMsgSerial()
 	// Send a dbus message that calls
 	// org.freedesktop.systemd1.Manager.ListUnits method
 	// to get an array of all currently loaded systemd units.
-	err := c.msgEnc.EncodeListUnits(c.conn)
+	err := c.msgEnc.EncodeListUnits(c.conn, serial)
 	if err != nil {
 		return err
 	}
@@ -117,11 +130,12 @@ func (c *Client) MainPID(service string) (uint32, error) {
 	}
 	defer c.mu.Unlock()
 
+	serial := c.nextMsgSerial()
 	// Send a dbus message that calls
 	// org.freedesktop.DBus.Properties.Get method
 	// to retrieve MainPID property from
 	// org.freedesktop.systemd1.Service interface.
-	err := c.msgEnc.EncodeMainPID(c.conn, service)
+	err := c.msgEnc.EncodeMainPID(c.conn, service, serial)
 	if err != nil {
 		return 0, err
 	}

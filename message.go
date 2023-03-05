@@ -193,7 +193,7 @@ type messageEncoder struct {
 }
 
 // EncodeListUnits encodes a request to systemd ListUnits method.
-func (e *messageEncoder) EncodeListUnits(conn io.Writer) error {
+func (e *messageEncoder) EncodeListUnits(conn io.Writer, msgSerial uint32) error {
 	// Reset the encoder to encode the header.
 	e.buf.Reset()
 	e.enc.Reset(e.buf)
@@ -202,7 +202,7 @@ func (e *messageEncoder) EncodeListUnits(conn io.Writer) error {
 		ByteOrder: littleEndian,
 		Type:      msgTypeMethodCall,
 		Proto:     1,
-		Serial:    2,
+		Serial:    msgSerial,
 		Fields: []headerField{
 			{Signature: "s", S: "ListUnits", Code: fieldMember},
 			{Signature: "s", S: "org.freedesktop.systemd1.Manager", Code: fieldInterface},
@@ -224,7 +224,7 @@ func (e *messageEncoder) EncodeListUnits(conn io.Writer) error {
 
 // EncodeMainPID encodes MainPID property request for the given unit name,
 // e.g., "dbus.service".
-func (e *messageEncoder) EncodeMainPID(conn io.Writer, unitName string) error {
+func (e *messageEncoder) EncodeMainPID(conn io.Writer, unitName string, msgSerial uint32) error {
 	// Escape an object path to send a call to,
 	// e.g., /org/freedesktop/systemd1/unit/dbus_2eservice.
 	e.buf.Reset()
@@ -240,7 +240,7 @@ func (e *messageEncoder) EncodeMainPID(conn io.Writer, unitName string) error {
 		ByteOrder: littleEndian,
 		Type:      msgTypeMethodCall,
 		Proto:     1,
-		Serial:    3,
+		Serial:    msgSerial,
 		Fields: []headerField{
 			{Signature: "o", S: objPath, Code: fieldPath},
 			{Signature: "s", S: "org.freedesktop.systemd1", Code: fieldDestination},

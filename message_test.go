@@ -13,7 +13,7 @@ import (
 func TestEncodeListUnits(t *testing.T) {
 	msgEnc := newMessageEncoder()
 	conn := &bytes.Buffer{}
-	err := msgEnc.EncodeListUnits(conn)
+	err := msgEnc.EncodeListUnits(conn, 2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +32,7 @@ func BenchmarkEncodeListUnits(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		conn.Reset()
 
-		err := msgEnc.EncodeListUnits(conn)
+		err := msgEnc.EncodeListUnits(conn, 2)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -42,7 +42,7 @@ func BenchmarkEncodeListUnits(b *testing.B) {
 func TestEncodeMainPID(t *testing.T) {
 	msgEnc := newMessageEncoder()
 	conn := &bytes.Buffer{}
-	err := msgEnc.EncodeMainPID(conn, "dbus.service")
+	err := msgEnc.EncodeMainPID(conn, "dbus.service", 3)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func BenchmarkEncodeMainPID(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		conn.Reset()
 
-		err := msgEnc.EncodeMainPID(conn, "dbus.service")
+		err := msgEnc.EncodeMainPID(conn, "dbus.service", 3)
 		if err != nil {
 			b.Fatal(err)
 		}
