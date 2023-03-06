@@ -88,7 +88,7 @@ func TestDecodeHeader(t *testing.T) {
 		},
 	}
 
-	conv := newStringConverter(4096)
+	conv := newStringConverter(DefaultStringConverterSize)
 
 	for name, tc := range tt {
 		t.Run(name, func(t *testing.T) {
@@ -109,7 +109,7 @@ func TestDecodeHeader(t *testing.T) {
 func BenchmarkDecodeHeader(b *testing.B) {
 	conn := bytes.NewReader(mainPIDResponse)
 	dec := newDecoder(conn)
-	conv := newStringConverter(4096)
+	conv := newStringConverter(DefaultStringConverterSize)
 	var h header
 
 	b.ResetTimer()

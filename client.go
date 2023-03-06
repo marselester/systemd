@@ -5,6 +5,7 @@
 package systemd
 
 import (
+	"bufio"
 	"fmt"
 	"net"
 	"os"
@@ -36,11 +37,19 @@ func Dial() (*net.UnixConn, error) {
 
 // New creates a new Client to access systemd via dbus.
 // By default, the external auth is used.
-func New(conn *net.UnixConn) (*Client, error) {
-	var err error
+func New(conn *net.UnixConn, opts ...Option) (*Client, error) {
+	conf := Config{
+		connReadSize:         DefaultConnectionReadSize,
+		strConvSize:          DefaultStringConverterSize,
+		isSerialCheckEnabled: false,
+	}
+	for _, opt := range opts {
+		opt(&conf)
+	}
 
 	// Send null byte as required by the protocol.
-	if _, err := conn.Write([]byte{0}); err != nil {
+	_, err := conn.Write([]byte{0})
+	if err != nil {
 		return nil, fmt.Errorf("dbus send null failed: %w", err)
 	}
 
@@ -52,20 +61,41 @@ func New(conn *net.UnixConn) (*Client, error) {
 		return nil, fmt.Errorf("dbus hello failed: %w", err)
 	}
 
-	c := Client{
-		conn:   conn,
-		msgDec: newMessageDecoder(),
-		msgEnc: newMessageEncoder(),
+	strConv := newStringConverter(conf.strConvSize)
+	msgEnc := messageEncoder{
+		Enc:  newEncoder(nil),
+		Conv: strConv,
 	}
+	msgDec := messageDecoder{
+		Dec:              newDecoder(nil),
+		Conv:             strConv,
+		SkipHeaderFields: true,
+	}
+	if conf.isSerialCheckEnabled {
+		msgDec.SkipHeaderFields = false
+	}
+
+	c := Client{
+		conf:    conf,
+		conn:    conn,
+		bufConn: bufio.NewReaderSize(conn, conf.connReadSize),
+		msgEnc:  &msgEnc,
+		msgDec:  &msgDec,
+	}
+
 	return &c, nil
 }
 
 // Client provides access to systemd via dbus.
 // A caller shouldn't use Client concurrently.
 type Client struct {
-	conn   *net.UnixConn
-	msgDec *messageDecoder
-	msgEnc *messageEncoder
+	conf Config
+	conn *net.UnixConn
+	// bufConn buffers the reads from a connection
+	// thus reducing count of read syscalls.
+	bufConn *bufio.Reader
+	msgEnc  *messageEncoder
+	msgDec  *messageDecoder
 
 	// According to https://dbus.freedesktop.org/doc/dbus-specification.html
 	// D-Bus connection receives messages serially.
@@ -93,6 +123,23 @@ func (c *Client) nextMsgSerial() uint32 {
 	return c.msgSerial
 }
 
+// verifyMsgSerial verifies that the message serial sent
+// in the request matches the reply serial found in the header field.
+func verifyMsgSerial(h *header, wantSerial uint32) error {
+	var replySerial uint32
+	for _, f := range h.Fields {
+		if f.Code == fieldReplySerial {
+			replySerial = uint32(f.U)
+			break
+		}
+	}
+
+	if wantSerial != replySerial {
+		return fmt.Errorf("message reply serial mismatch: want %d got %d", wantSerial, replySerial)
+	}
+	return nil
+}
+
 // ListUnits fetches systemd units and calls f.
 // The pointer to Unit struct in f must not be retained,
 // because its fields change on each f call.
@@ -115,7 +162,16 @@ func (c *Client) ListUnits(f func(*Unit)) error {
 		return err
 	}
 
-	return c.msgDec.DecodeListUnits(c.conn, f)
+	err = c.msgDec.DecodeListUnits(c.bufConn, f)
+	if err != nil {
+		return err
+	}
+
+	if c.conf.isSerialCheckEnabled {
+		err = verifyMsgSerial(c.msgDec.Header(), serial)
+	}
+
+	return err
 }
 
 // MainPID fetches the main PID of the service or 0 if there was an error.
@@ -124,7 +180,7 @@ func (c *Client) ListUnits(f func(*Unit)) error {
 // because that would imply concurrent reading from the same underlying connection.
 // Simply waiting on a lock won't help, because ListUnits won't be able to
 // finish waiting for MainPID, thus creating a deadlock.
-func (c *Client) MainPID(service string) (uint32, error) {
+func (c *Client) MainPID(service string) (pid uint32, err error) {
 	if !c.mu.TryLock() {
 		return 0, fmt.Errorf("must be called serially")
 	}
@@ -135,10 +191,19 @@ func (c *Client) MainPID(service string) (uint32, error) {
 	// org.freedesktop.DBus.Properties.Get method
 	// to retrieve MainPID property from
 	// org.freedesktop.systemd1.Service interface.
-	err := c.msgEnc.EncodeMainPID(c.conn, service, serial)
+	err = c.msgEnc.EncodeMainPID(c.conn, service, serial)
 	if err != nil {
 		return 0, err
 	}
 
-	return c.msgDec.DecodeMainPID(c.conn)
+	pid, err = c.msgDec.DecodeMainPID(c.bufConn)
+	if err != nil {
+		return pid, err
+	}
+
+	if c.conf.isSerialCheckEnabled {
+		err = verifyMsgSerial(c.msgDec.Header(), serial)
+	}
+
+	return pid, err
 }

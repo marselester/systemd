@@ -25,7 +25,11 @@ func main() {
 		log.Print(err)
 		return
 	}
-	defer conn.Close()
+	defer func() {
+		if err = conn.Close(); err != nil {
+			log.Print(err)
+		}
+	}()
 
 	c, err := systemd.New(conn)
 	if err != nil {

@@ -79,25 +79,34 @@ $ benchstat bench-old.txt bench-new.txt
 
 ```
 name               old time/op    new time/op    delta
-DecodeString-2       54.8ns ± 2%    54.7ns ± 2%    -0.35%  (p=0.006 n=98+99)
-DecodeHeader-2        345ns ± 8%     341ns ± 7%    -0.96%  (p=0.010 n=95+95)
-EncodeHeader-2        305ns ± 2%     177ns ± 2%   -41.91%  (p=0.000 n=96+99)
-DecodeMainPID-2       159ns ± 6%     160ns ± 8%      ~     (p=0.095 n=93+98)
-DecodeListUnits-2    99.0µs ± 9%    97.9µs ± 8%    -1.05%  (p=0.039 n=96+94)
+DecodeString-2       54.6ns ± 2%    54.3ns ± 3%   -0.63%  (p=0.000 n=99+97)
+EscapeBusLabel-2     42.9ns ± 2%    47.6ns ± 3%  +10.94%  (p=0.000 n=98+99)
+DecodeHeader-2        343ns ± 7%     341ns ± 5%     ~     (p=0.274 n=98+92)
+EncodeHeader-2        185ns ± 2%     190ns ± 5%   +2.25%  (p=0.000 n=99+99)
+EncodeListUnits-2     232ns ± 3%     233ns ± 3%   +0.32%  (p=0.034 n=97+93)
+EncodeMainPID-2       374ns ± 2%     377ns ± 3%   +0.82%  (p=0.000 n=97+93)
+DecodeMainPID-2       159ns ±10%     135ns ± 4%  -15.59%  (p=0.000 n=98+98)
+DecodeListUnits-2    99.0µs ±10%    93.3µs ± 4%   -5.71%  (p=0.000 n=96+99)
 
 name               old alloc/op   new alloc/op   delta
-DecodeString-2        0.00B          0.00B           ~     (all equal)
-DecodeHeader-2        15.0B ± 0%     15.0B ± 0%      ~     (all equal)
-EncodeHeader-2        32.0B ± 0%      0.0B       -100.00%  (p=0.000 n=100+100)
-DecodeMainPID-2       24.0B ± 0%     24.0B ± 0%      ~     (all equal)
-DecodeListUnits-2    25.6kB ± 0%    25.6kB ± 0%      ~     (all equal)
+DecodeString-2        0.00B          0.00B          ~     (all equal)
+EscapeBusLabel-2      0.00B          0.00B          ~     (all equal)
+DecodeHeader-2        15.0B ± 0%     15.0B ± 0%     ~     (all equal)
+EncodeHeader-2        0.00B          0.00B          ~     (all equal)
+EncodeListUnits-2     0.00B          0.00B          ~     (all equal)
+EncodeMainPID-2       45.0B ± 0%     45.0B ± 0%     ~     (all equal)
+DecodeMainPID-2       24.0B ± 0%     24.0B ± 0%     ~     (all equal)
+DecodeListUnits-2    25.6kB ± 0%    25.6kB ± 0%     ~     (all equal)
 
 name               old allocs/op  new allocs/op  delta
-DecodeString-2         0.00           0.00           ~     (all equal)
-DecodeHeader-2         0.00           0.00           ~     (all equal)
-EncodeHeader-2         9.00 ± 0%      0.00       -100.00%  (p=0.000 n=100+100)
-DecodeMainPID-2        1.00 ± 0%      1.00 ± 0%      ~     (all equal)
-DecodeListUnits-2      7.00 ± 0%      7.00 ± 0%      ~     (all equal)
+DecodeString-2         0.00           0.00          ~     (all equal)
+EscapeBusLabel-2       0.00           0.00          ~     (all equal)
+DecodeHeader-2         0.00           0.00          ~     (all equal)
+EncodeHeader-2         0.00           0.00          ~     (all equal)
+EncodeListUnits-2      0.00           0.00          ~     (all equal)
+EncodeMainPID-2        0.00           0.00          ~     (all equal)
+DecodeMainPID-2        1.00 ± 0%      1.00 ± 0%     ~     (all equal)
+DecodeListUnits-2      7.00 ± 0%      7.00 ± 0%     ~     (all equal)
 ```
 
 </details>
