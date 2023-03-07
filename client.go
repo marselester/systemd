@@ -124,6 +124,11 @@ type Client struct {
 	msgSerial uint32
 }
 
+// Close closes the connection.
+func (c *Client) Close() error {
+	return c.conf.conn.Close()
+}
+
 // nextMsgSerial returns the next message number.
 // It resets the serial to 1 after overflowing.
 func (c *Client) nextMsgSerial() uint32 {

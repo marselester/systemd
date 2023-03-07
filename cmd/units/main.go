@@ -29,6 +29,11 @@ func main() {
 			log.Print(err)
 			return
 		}
+		defer func() {
+			if err = c.Close(); err != nil {
+				log.Print(err)
+			}
+		}()
 	} else {
 		conn, err := systemd.Dial(*addr)
 		if err != nil {
