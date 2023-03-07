@@ -14,10 +14,9 @@ import (
 )
 
 // Dial connects to dbus via a Unix domain socket
-// specified by DBUS_SESSION_BUS_ADDRESS env var,
+// specified by a bus address,
 // for example, "unix:path=/run/user/1000/bus".
-func Dial() (*net.UnixConn, error) {
-	busAddr := os.Getenv("DBUS_SESSION_BUS_ADDRESS")
+func Dial(busAddr string) (*net.UnixConn, error) {
 	prefix := "unix:path="
 	if !strings.HasPrefix(busAddr, prefix) {
 		return nil, fmt.Errorf("dbus address not found")
@@ -37,7 +36,14 @@ func Dial() (*net.UnixConn, error) {
 
 // New creates a new Client to access systemd via dbus.
 // By default, the external auth is used.
-func New(conn *net.UnixConn, opts ...Option) (*Client, error) {
+//
+// The address of the system message bus is given in
+// the DBUS_SYSTEM_BUS_ADDRESS environment variable.
+// If that variable is not set,
+// the Client will try to connect to the well-known address
+// unix:path=/var/run/dbus/system_bus_socket, see
+// https://dbus.freedesktop.org/doc/dbus-specification.html.
+func New(opts ...Option) (*Client, error) {
 	conf := Config{
 		connReadSize:         DefaultConnectionReadSize,
 		strConvSize:          DefaultStringConverterSize,
@@ -47,17 +53,25 @@ func New(conn *net.UnixConn, opts ...Option) (*Client, error) {
 		opt(&conf)
 	}
 
-	// Send null byte as required by the protocol.
-	_, err := conn.Write([]byte{0})
-	if err != nil {
-		return nil, fmt.Errorf("dbus send null failed: %w", err)
+	// Establish a connection if a caller hasn't provided one.
+	var err error
+	if conf.conn == nil {
+		addr := os.Getenv("DBUS_SYSTEM_BUS_ADDRESS")
+		if addr == "" {
+			addr = "unix:path=/var/run/dbus/system_bus_socket"
+		}
+
+		conf.conn, err = Dial(addr)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	if err = authExternal(conn); err != nil {
+	if err = authExternal(conf.conn); err != nil {
 		return nil, fmt.Errorf("dbus auth failed: %w", err)
 	}
 
-	if err = sendHello(conn); err != nil {
+	if err = sendHello(conf.conn); err != nil {
 		return nil, fmt.Errorf("dbus hello failed: %w", err)
 	}
 
@@ -77,8 +91,7 @@ func New(conn *net.UnixConn, opts ...Option) (*Client, error) {
 
 	c := Client{
 		conf:    conf,
-		conn:    conn,
-		bufConn: bufio.NewReaderSize(conn, conf.connReadSize),
+		bufConn: bufio.NewReaderSize(conf.conn, conf.connReadSize),
 		msgEnc:  &msgEnc,
 		msgDec:  &msgDec,
 	}
@@ -90,7 +103,6 @@ func New(conn *net.UnixConn, opts ...Option) (*Client, error) {
 // A caller shouldn't use Client concurrently.
 type Client struct {
 	conf Config
-	conn *net.UnixConn
 	// bufConn buffers the reads from a connection
 	// thus reducing count of read syscalls.
 	bufConn *bufio.Reader
@@ -157,7 +169,7 @@ func (c *Client) ListUnits(f func(*Unit)) error {
 	// Send a dbus message that calls
 	// org.freedesktop.systemd1.Manager.ListUnits method
 	// to get an array of all currently loaded systemd units.
-	err := c.msgEnc.EncodeListUnits(c.conn, serial)
+	err := c.msgEnc.EncodeListUnits(c.conf.conn, serial)
 	if err != nil {
 		return err
 	}
@@ -174,7 +186,9 @@ func (c *Client) ListUnits(f func(*Unit)) error {
 	return err
 }
 
-// MainPID fetches the main PID of the service or 0 if there was an error.
+// MainPID fetches the main PID of the service.
+// If a service is inactive (see Unit.ActiveState),
+// the returned PID will be zero.
 //
 // Note, you can't call this method within ListUnits's f func,
 // because that would imply concurrent reading from the same underlying connection.
@@ -191,7 +205,7 @@ func (c *Client) MainPID(service string) (pid uint32, err error) {
 	// org.freedesktop.DBus.Properties.Get method
 	// to retrieve MainPID property from
 	// org.freedesktop.systemd1.Service interface.
-	err = c.msgEnc.EncodeMainPID(c.conn, service, serial)
+	err = c.msgEnc.EncodeMainPID(c.conf.conn, service, serial)
 	if err != nil {
 		return 0, err
 	}

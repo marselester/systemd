@@ -11,16 +11,11 @@ If you find the API too limiting or missing some of functionality,
 perhaps https://github.com/coreos/go-systemd might suit you better.
 
 ```go
-conn, err := systemd.Dial()
+c, err := systemd.New()
 if err != nil {
     log.Fatal(err)
 }
-defer conn.Close()
-
-c, err := systemd.New(conn)
-if err != nil {
-    log.Fatal(err)
-}
+defer c.Close()
 
 err = c.ListUnits(func(u *systemd.Unit) {
     if strings.HasSuffix(u.Name, ".service") {

@@ -69,7 +69,7 @@ func (h *header) Order() binary.ByteOrder {
 	}
 }
 
-// Len returns the lenght of the message header including padding at the end.
+// Len returns the length of the message header including padding at the end.
 func (h *header) Len() uint32 {
 	wantHdrLen := msgPrologueSize + h.FieldsLen
 	_, padding := nextOffset(wantHdrLen, 8)

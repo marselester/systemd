@@ -17,24 +17,36 @@ func main() {
 	exitCode := 1
 	defer func() { os.Exit(exitCode) }()
 
+	addr := flag.String("addr", "", "bus address")
 	onlyServices := flag.Bool("svc", false, "show only services")
 	flag.Parse()
 
-	conn, err := systemd.Dial()
-	if err != nil {
-		log.Print(err)
-		return
-	}
-	defer func() {
-		if err = conn.Close(); err != nil {
+	var (
+		c   *systemd.Client
+		err error
+	)
+	if *addr == "" {
+		if c, err = systemd.New(); err != nil {
 			log.Print(err)
+			return
 		}
-	}()
+	} else {
+		conn, err := systemd.Dial(*addr)
+		if err != nil {
+			log.Print(err)
+			return
+		}
+		defer func() {
+			if err = conn.Close(); err != nil {
+				log.Print(err)
+			}
+		}()
 
-	c, err := systemd.New(conn)
-	if err != nil {
-		log.Print(err)
-		return
+		c, err = systemd.New(systemd.WithConnection(conn))
+		if err != nil {
+			log.Print(err)
+			return
+		}
 	}
 
 	if *onlyServices {

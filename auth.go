@@ -22,6 +22,11 @@ The client is authenticating as Unix uid 1000 in this example,
 where 31303030 is ASCII decimal 1000 represented in hex.
 */
 func authExternal(rw io.ReadWriter) error {
+	// Send null byte as required by the protocol.
+	if _, err := rw.Write([]byte{0}); err != nil {
+		return fmt.Errorf("send null failed: %w", err)
+	}
+
 	uid := strconv.Itoa(os.Geteuid())
 	var buf bytes.Buffer
 	buf.WriteString("AUTH EXTERNAL ")

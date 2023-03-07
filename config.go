@@ -1,5 +1,9 @@
 package systemd
 
+import (
+	"net"
+)
+
 const (
 	// DefaultConnectionReadSize is the default size (in bytes)
 	// of the buffer which is used for reading from a connection.
@@ -20,6 +24,8 @@ const (
 
 // Config represents a Client config.
 type Config struct {
+	// conn is a connection to a D-Bus server.
+	conn *net.UnixConn
 	// connReadSize defines the length of a buffer to read from
 	// a D-Bus connection.
 	connReadSize int
@@ -31,6 +37,14 @@ type Config struct {
 
 // Option sets up a Config.
 type Option func(*Config)
+
+// WithConnection sets a D-Bus connection to use instead
+// of establishing a default connection.
+func WithConnection(conn *net.UnixConn) Option {
+	return func(c *Config) {
+		c.conn = conn
+	}
+}
 
 // WithConnectionReadSize sets a size of a buffer
 // which is used for reading from a D-Bus connection.

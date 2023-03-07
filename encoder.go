@@ -72,7 +72,7 @@ func (e *encoder) Uint32(u uint32) {
 }
 
 // Uint32At encodes UINT32 at the given offset.
-// This is usefull when overwriting a header field such as FieldsLen
+// This is useful when overwriting a header field such as FieldsLen
 // because it is not known in advance.
 func (e *encoder) Uint32At(u, offset uint32) error {
 	if offset < 0 || int(offset) >= e.dst.Len() {
