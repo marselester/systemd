@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"io"
 	"runtime"
-	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -114,10 +113,8 @@ func TestDecodeListUnits(t *testing.T) {
 	runtime.ReadMemStats(stat)
 	liveBefore := int(stat.Mallocs - stat.Frees)
 
-	err := msgDec.DecodeListUnits(conn, func(u *Unit) {
-		if strings.HasSuffix(u.Name, ".service") {
-			got = append(got, *u)
-		}
+	err := msgDec.DecodeListUnits(conn, IsService, func(u *Unit) {
+		got = append(got, *u)
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -148,10 +145,8 @@ func BenchmarkDecodeListUnits(b *testing.B) {
 		conn.Seek(0, io.SeekStart)
 		got = got[:0]
 
-		err := msgDec.DecodeListUnits(conn, func(u *Unit) {
-			if strings.HasSuffix(u.Name, ".service") {
-				got = append(got, *u)
-			}
+		err := msgDec.DecodeListUnits(conn, IsService, func(u *Unit) {
+			got = append(got, *u)
 		})
 		if err != nil {
 			b.Error(err)

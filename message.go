@@ -37,6 +37,33 @@ type Unit struct {
 	JobPath string
 }
 
+// Predicate is used to filter out a decoded struct
+// based on its field index and a value.
+// This helps to reduce memory consumption
+// because a decoder can ignore the remaining struct fields.
+// For example, D-Bus ListUnits returns tens of kilobytes
+// in a reply, but a caller is interested only in service units.
+//
+// The field name would be more convenient to work with
+// compared to a field index, but that causes unintended allocs.
+type Predicate func(fieldIndex int, value []byte) bool
+
+var svcSuffix = []byte(".service")
+
+// IsService is a predicate that filters systemd services,
+// i.e., units whose name (field index 0) ends with ".service".
+// For example, "ssh.service".
+//
+// A benchmark showed ~4.5 less KB/op when decoding 35KB message.
+func IsService(fieldIndex int, s []byte) bool {
+	switch fieldIndex {
+	case 0:
+		return bytes.HasSuffix(s, svcSuffix)
+	default:
+		return true
+	}
+}
+
 func newMessageDecoder() *messageDecoder {
 	return &messageDecoder{
 		Dec:              newDecoder(nil),
@@ -69,7 +96,7 @@ func (d *messageDecoder) Header() *header {
 // DecodeListUnits decodes a reply from systemd ListUnits method.
 // The pointer to Unit struct in f must not be retained,
 // because its fields change on each f call.
-func (d *messageDecoder) DecodeListUnits(conn io.Reader, f func(*Unit)) error {
+func (d *messageDecoder) DecodeListUnits(conn io.Reader, p Predicate, f func(*Unit)) error {
 	d.Dec.Reset(conn)
 
 	// Decode the message header (16 bytes).
@@ -109,18 +136,34 @@ func (d *messageDecoder) DecodeListUnits(conn io.Reader, f func(*Unit)) error {
 		return fmt.Errorf("discard unit array length: %w", err)
 	}
 
-	for ; err == nil; err = decodeUnit(d.Dec, d.Conv, &d.unit) {
-		f(&d.unit)
+	for {
+		err = decodeUnit(d.Dec, d.Conv, p, &d.unit)
+		switch err {
+		case nil:
+			f(&d.unit)
+		case errIgnore:
+		case io.EOF:
+			return nil
+		default:
+			return fmt.Errorf("message body: %w", err)
+		}
 	}
-	if err != io.EOF {
-		return fmt.Errorf("message body: %w", err)
-	}
-
-	return nil
 }
 
+type sentinelError string
+
+func (e sentinelError) Error() string { return string(e) }
+
+const errIgnore = sentinelError("ignore")
+
 // decodeUnit decodes D-Bus Unit struct.
-func decodeUnit(d *decoder, conv *stringConverter, unit *Unit) error {
+// A caller can supply a predicate to reduce allocs.
+// If a predicate filtered out the struct, the errIgnore is returned.
+// In that case the unit would contain unusable data.
+//
+// Note, despite a predicate, all the struct fields are processed
+// to advance the decoder.
+func decodeUnit(d *decoder, conv *stringConverter, p Predicate, unit *Unit) error {
 	// The "()" symbols in the signature represent a STRUCT
 	// which is always aligned to an 8-byte boundary,
 	// regardless of the alignments of their contents.
@@ -131,6 +174,7 @@ func decodeUnit(d *decoder, conv *stringConverter, unit *Unit) error {
 	// The Unit struct's fields represent the signature "ssssssouso".
 	// Here we decode all its fields sequentially.
 	v := reflect.ValueOf(unit).Elem()
+	var ignore bool
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Field(i)
 
@@ -140,7 +184,12 @@ func decodeUnit(d *decoder, conv *stringConverter, unit *Unit) error {
 			if err != nil {
 				return err
 			}
-			field.SetString(conv.String(s))
+
+			if p == nil || p(i, s) {
+				field.SetString(conv.String(s))
+			} else {
+				ignore = true
+			}
 
 		case reflect.Uint32:
 			u, err := d.Uint32()
@@ -149,6 +198,12 @@ func decodeUnit(d *decoder, conv *stringConverter, unit *Unit) error {
 			}
 			field.SetUint(uint64(u))
 		}
+	}
+
+	// Indicate that a caller must ignore the unit struct
+	// because some fields were not decoded due to the predicate.
+	if ignore {
+		return errIgnore
 	}
 
 	return nil

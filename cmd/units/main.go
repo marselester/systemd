@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 
 	"github.com/marselester/systemd"
 )
@@ -52,7 +51,7 @@ func main() {
 	if *onlyServices {
 		err = printServices(c)
 	} else {
-		err = c.ListUnits(printAll)
+		err = c.ListUnits(nil, printAll)
 	}
 	if err != nil {
 		log.Print(err)
@@ -71,12 +70,10 @@ func printAll(u *systemd.Unit) {
 // It ignores non-service units.
 func printServices(c *systemd.Client) error {
 	var services []systemd.Unit
-	err := c.ListUnits(func(u *systemd.Unit) {
-		if strings.HasSuffix(u.Name, ".service") {
-			// Must copy a unit,
-			// otherwise it will be modified on the next function call.
-			services = append(services, *u)
-		}
+	err := c.ListUnits(systemd.IsService, func(u *systemd.Unit) {
+		// Must copy a unit,
+		// otherwise it will be modified on the next function call.
+		services = append(services, *u)
 	})
 	if err != nil {
 		return err

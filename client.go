@@ -152,14 +152,15 @@ func verifyMsgSerial(h *header, wantSerial uint32) error {
 	return nil
 }
 
-// ListUnits fetches systemd units and calls f.
+// ListUnits fetches systemd units,
+// optionally filters them with a given predicate, and calls f.
 // The pointer to Unit struct in f must not be retained,
 // because its fields change on each f call.
 //
 // Note, don't call any Client's methods within f,
 // because concurrent reading from the same underlying connection
 // is not supported.
-func (c *Client) ListUnits(f func(*Unit)) error {
+func (c *Client) ListUnits(p Predicate, f func(*Unit)) error {
 	if !c.mu.TryLock() {
 		return fmt.Errorf("must be called serially")
 	}
@@ -174,7 +175,7 @@ func (c *Client) ListUnits(f func(*Unit)) error {
 		return err
 	}
 
-	err = c.msgDec.DecodeListUnits(c.bufConn, f)
+	err = c.msgDec.DecodeListUnits(c.bufConn, p, f)
 	if err != nil {
 		return err
 	}
