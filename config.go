@@ -63,15 +63,15 @@ func WithStringConverterSize(size int) Option {
 	}
 }
 
-// WithSerialCheck when true enables checking of message serials,
+// WithSerialCheck enables checking of message serials,
 // i.e., the Client will compare the serial number sent within a message to D-Bus
 // with the serial received in the reply.
 //
 // Note, this requires decoding of header fields which incurs extra allocs.
 // There shouldn't be any request/reply mishmash because
 // the Client guarantees that the underlying D-Bus connection is accessed sequentially.
-func WithSerialCheck(enable bool) Option {
+func WithSerialCheck() Option {
 	return func(c *Config) {
-		c.isSerialCheckEnabled = enable
+		c.isSerialCheckEnabled = true
 	}
 }
