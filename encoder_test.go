@@ -14,6 +14,7 @@ func TestEscapeBusLabel(t *testing.T) {
 		"foo_bar@bar.service":                  "foo_5fbar_40bar_2eservice",
 		"systemd-networkd-wait-online.service": "systemd_2dnetworkd_2dwait_2donline_2eservice",
 		"555":                                  "_3555",
+		"dev-ttyS8.device":                     "dev_2dttyS8_2edevice",
 	}
 
 	buf := &bytes.Buffer{}

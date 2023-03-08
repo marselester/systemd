@@ -177,12 +177,12 @@ func (c *Client) ListUnits(p Predicate, f func(*Unit)) error {
 	// to get an array of all currently loaded systemd units.
 	err := c.msgEnc.EncodeListUnits(c.conf.conn, serial)
 	if err != nil {
-		return err
+		return fmt.Errorf("encode ListUnits: %w", err)
 	}
 
 	err = c.msgDec.DecodeListUnits(c.bufConn, p, f)
 	if err != nil {
-		return err
+		return fmt.Errorf("decode ListUnits: %w", err)
 	}
 
 	if c.conf.isSerialCheckEnabled {
@@ -213,12 +213,12 @@ func (c *Client) MainPID(service string) (pid uint32, err error) {
 	// org.freedesktop.systemd1.Service interface.
 	err = c.msgEnc.EncodeMainPID(c.conf.conn, service, serial)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("encode MainPID: %w", err)
 	}
 
 	pid, err = c.msgDec.DecodeMainPID(c.bufConn)
 	if err != nil {
-		return pid, err
+		return pid, fmt.Errorf("decode MainPID: %w", err)
 	}
 
 	if c.conf.isSerialCheckEnabled {

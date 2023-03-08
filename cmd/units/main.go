@@ -81,13 +81,13 @@ func printServices(c *systemd.Client) error {
 		services = append(services, *u)
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get systemd units: %w", err)
 	}
 
 	var pid uint32
 	for _, s := range services {
 		if pid, err = c.MainPID(s.Name); err != nil {
-			return err
+			return fmt.Errorf("failed to get PID for service %q: %w", s.Name, err)
 		}
 
 		fmt.Printf("%d %s %s\n", pid, s.Name, s.ActiveState)

@@ -126,6 +126,16 @@ func (d *messageDecoder) DecodeListUnits(conn io.Reader, p Predicate, f func(*Un
 	)
 	d.Dec.Reset(body)
 
+	// Decode an error reply.
+	if d.hdr.Type == msgTypeError {
+		s, err := d.Dec.String()
+		if err != nil {
+			return fmt.Errorf("decode error reply: %w", err)
+		}
+
+		return fmt.Errorf(d.Conv.String(s))
+	}
+
 	// ListUnits has a body signature "a(ssssssouso)" which is
 	// ARRAY of STRUCT of (STRING, STRING, STRING, STRING, STRING, STRING,
 	// OBJECT_PATH, UINT32, STRING, OBJECT_PATH).
@@ -225,12 +235,27 @@ func (d *messageDecoder) DecodeMainPID(conn io.Reader) (uint32, error) {
 	)
 	d.Dec.Reset(body)
 
-	// Discard known signature "u".
-	if _, err = d.Dec.Signature(); err != nil {
-		return 0, err
+	// Decode an error reply, e.g., invalid unit name.
+	if d.hdr.Type == msgTypeError {
+		s, err := d.Dec.String()
+		if err != nil {
+			return 0, fmt.Errorf("decode error reply: %w", err)
+		}
+
+		return 0, fmt.Errorf(d.Conv.String(s))
 	}
 
-	return d.Dec.Uint32()
+	// Discard known signature "u".
+	if _, err = d.Dec.Signature(); err != nil {
+		return 0, fmt.Errorf("discard signature u: %w", err)
+	}
+
+	var pid uint32
+	if pid, err = d.Dec.Uint32(); err != nil {
+		return 0, fmt.Errorf("decode pid: %w", err)
+	}
+
+	return pid, nil
 }
 
 func newMessageEncoder() *messageEncoder {
