@@ -23,7 +23,7 @@ func TestEscapeBusLabel(t *testing.T) {
 		buf.Reset()
 
 		escapeBusLabel(name, buf)
-		got := string(buf.Bytes())
+		got := buf.String()
 		if want != got {
 			t.Errorf("expected %q got %q", want, got)
 		}

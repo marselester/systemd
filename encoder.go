@@ -75,7 +75,7 @@ func (e *encoder) Uint32(u uint32) {
 // This is useful when overwriting a header field such as FieldsLen
 // because it is not known in advance.
 func (e *encoder) Uint32At(u, offset uint32) error {
-	if offset < 0 || int(offset) >= e.dst.Len() {
+	if int(offset) >= e.dst.Len() {
 		return fmt.Errorf("offset is out of range: %d/%d", offset, e.dst.Len())
 	}
 

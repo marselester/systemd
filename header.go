@@ -125,7 +125,7 @@ func decodeHeader(dec *decoder, conv *stringConverter, h *header, skipFields boo
 	// A caller might already know the signature from the spec
 	// and choose not to decode the fields as an optimization.
 	if skipFields {
-		if b, err = dec.ReadN(h.FieldsLen); err != nil {
+		if _, err = dec.ReadN(h.FieldsLen); err != nil {
 			return fmt.Errorf("message header: %w", err)
 		}
 	} else {

@@ -158,7 +158,7 @@ func readN(src io.Reader, buf *bytes.Buffer, n int) ([]byte, error) {
 		return nil, err
 	}
 	if k != n {
-		k, err = src.Read(b[k:])
+		_, err = src.Read(b[k:])
 	}
 
 	return b, err
