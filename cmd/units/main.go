@@ -18,14 +18,20 @@ func main() {
 
 	addr := flag.String("addr", "", "bus address")
 	onlyServices := flag.Bool("svc", false, "show only services")
+	checkSerial := flag.Bool("serial", false, "check message serial")
 	flag.Parse()
+
+	var opts []systemd.Option
+	if *checkSerial {
+		opts = append(opts, systemd.WithSerialCheck())
+	}
 
 	var (
 		c   *systemd.Client
 		err error
 	)
 	if *addr == "" {
-		if c, err = systemd.New(); err != nil {
+		if c, err = systemd.New(opts...); err != nil {
 			log.Print(err)
 			return
 		}
@@ -46,7 +52,8 @@ func main() {
 			}
 		}()
 
-		c, err = systemd.New(systemd.WithConnection(conn))
+		opts = append(opts, systemd.WithConnection(conn))
+		c, err = systemd.New(opts...)
 		if err != nil {
 			log.Print(err)
 			return

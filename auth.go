@@ -55,21 +55,3 @@ func authExternal(rw io.ReadWriter) error {
 
 	return nil
 }
-
-func sendHello(conn io.ReadWriter) error {
-	_, err := conn.Write(helloMsg)
-	if err != nil {
-		return err
-	}
-
-	// TODO: decode and handle the reply, but skip them for now.
-	// Usually reply is 261 bytes, read them all with big enough buffer in one Read call.
-	b := make([]byte, 300)
-	if _, err = conn.Read(b); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-var helloMsg = []byte{108, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 110, 0, 0, 0, 6, 1, 115, 0, 20, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 68, 66, 117, 115, 0, 0, 0, 0, 3, 1, 115, 0, 5, 0, 0, 0, 72, 101, 108, 108, 111, 0, 0, 0, 2, 1, 115, 0, 20, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 68, 66, 117, 115, 0, 0, 0, 0, 1, 1, 111, 0, 21, 0, 0, 0, 47, 111, 114, 103, 47, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 47, 68, 66, 117, 115, 0, 0, 0}

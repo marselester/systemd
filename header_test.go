@@ -13,6 +13,62 @@ func TestDecodeHeader(t *testing.T) {
 		in   []byte
 		want header
 	}{
+		"hello request": {
+			in: helloRequest,
+			want: header{
+				ByteOrder: littleEndian,
+				Type:      msgTypeMethodCall,
+				Flags:     0,
+				Proto:     1,
+				BodyLen:   0,
+				Serial:    1,
+				FieldsLen: 110,
+				Fields: []headerField{
+					{Signature: "s", S: "org.freedesktop.DBus", Code: fieldDestination},
+					{Signature: "s", S: "Hello", Code: fieldMember},
+					{Signature: "s", S: "org.freedesktop.DBus", Code: fieldInterface},
+					{Signature: "o", S: "/org/freedesktop/DBus", Code: fieldPath},
+				},
+			},
+		},
+		"hello response": {
+			in: helloResponse,
+			want: header{
+				ByteOrder: littleEndian,
+				Type:      msgTypeMethodReply,
+				Flags:     1,
+				Proto:     1,
+				BodyLen:   10,
+				Serial:    1,
+				FieldsLen: 61,
+				Fields: []headerField{
+					{Signature: "s", S: ":1.47", Code: fieldDestination},
+					{Signature: "u", U: 1, Code: fieldReplySerial},
+					{Signature: "g", S: "s", Code: fieldSignature},
+					{Signature: "s", S: "org.freedesktop.DBus", Code: fieldSender},
+				},
+			},
+		},
+		"name acquired signal": {
+			in: nameAcquiredSignal,
+			want: header{
+				ByteOrder: littleEndian,
+				Type:      msgTypeSignal,
+				Flags:     1,
+				Proto:     1,
+				BodyLen:   11,
+				Serial:    2,
+				FieldsLen: 141,
+				Fields: []headerField{
+					{Signature: "o", S: "/org/freedesktop/DBus", Code: fieldPath},
+					{Signature: "s", S: "org.freedesktop.DBus", Code: fieldInterface},
+					{Signature: "s", S: "NameAcquired", Code: fieldMember},
+					{Signature: "s", S: ":1.100", Code: fieldDestination},
+					{Signature: "g", S: "s", Code: fieldSignature},
+					{Signature: "s", S: "org.freedesktop.DBus", Code: fieldSender},
+				},
+			},
+		},
 		"pid request": {
 			in: mainPIDRequest,
 			want: header{
@@ -47,6 +103,25 @@ func TestDecodeHeader(t *testing.T) {
 					{Signature: "s", S: ":1.388", Code: fieldDestination},
 					{Signature: "g", S: "v", Code: fieldSignature},
 					{Signature: "s", S: ":1.0", Code: fieldSender},
+				},
+			},
+		},
+		"pid unknown property response": {
+			in: mainPIDUnknownPropertyResponse,
+			want: header{
+				ByteOrder: littleEndian,
+				Type:      msgTypeError,
+				Flags:     1,
+				Proto:     1,
+				BodyLen:   76,
+				Serial:    4655,
+				FieldsLen: 103,
+				Fields: []headerField{
+					{Signature: "u", U: 4, Code: fieldReplySerial},
+					{Signature: "s", S: ":1.568", Code: fieldDestination},
+					{Signature: "s", S: "org.freedesktop.DBus.Error.UnknownProperty", Code: fieldErrorName},
+					{Signature: "g", S: "s", Code: fieldSignature},
+					{Signature: "s", S: ":1.489", Code: fieldSender},
 				},
 			},
 		},
@@ -86,29 +161,10 @@ func TestDecodeHeader(t *testing.T) {
 				},
 			},
 		},
-		"pid unknown property response": {
-			in: mainPIDUnknownPropertyResponse,
-			want: header{
-				ByteOrder: 108,
-				Type:      msgTypeError,
-				Flags:     1,
-				Proto:     1,
-				BodyLen:   76,
-				Serial:    4655,
-				FieldsLen: 103,
-				Fields: []headerField{
-					{Signature: "u", U: 4, Code: fieldReplySerial},
-					{Signature: "s", S: ":1.568", Code: fieldDestination},
-					{Signature: "s", S: "org.freedesktop.DBus.Error.UnknownProperty", Code: fieldErrorName},
-					{Signature: "g", S: "s", Code: fieldSignature},
-					{Signature: "s", S: ":1.489", Code: fieldSender},
-				},
-			},
-		},
 		"units access denied response": {
 			in: listUnitsAccessDeniedResponse,
 			want: header{
-				ByteOrder: 108,
+				ByteOrder: littleEndian,
 				Type:      msgTypeError,
 				Flags:     1,
 				Proto:     1,

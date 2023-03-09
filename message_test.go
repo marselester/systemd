@@ -9,21 +9,21 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-func TestEncodeListUnits(t *testing.T) {
+func TestEncodeHello(t *testing.T) {
 	msgEnc := newMessageEncoder()
 	conn := &bytes.Buffer{}
-	err := msgEnc.EncodeListUnits(conn, 2)
+	err := msgEnc.EncodeHello(conn, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	got := conn.Bytes()
-	if diff := cmp.Diff(listUnitsRequest, got); diff != "" {
+	if diff := cmp.Diff(helloRequest, got); diff != "" {
 		t.Error(diff)
 	}
 }
 
-func BenchmarkEncodeListUnits(b *testing.B) {
+func BenchmarkEncodeHello(b *testing.B) {
 	msgEnc := newMessageEncoder()
 	conn := &bytes.Buffer{}
 
@@ -31,12 +31,56 @@ func BenchmarkEncodeListUnits(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		conn.Reset()
 
-		err := msgEnc.EncodeListUnits(conn, 2)
+		err := msgEnc.EncodeHello(conn, 1)
 		if err != nil {
 			b.Fatal(err)
 		}
 	}
 }
+
+func TestDecodeHello(t *testing.T) {
+	conn := bytes.NewReader(helloResponse)
+	msgDec := newMessageDecoder()
+
+	connName, err := msgDec.DecodeHello(conn)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wantName := ":1.47"
+	if wantName != connName {
+		t.Errorf("expected connection name %q got %q", wantName, connName)
+	}
+
+	if _, err = conn.ReadByte(); err != io.EOF {
+		t.Errorf("conn has unread bytes")
+	}
+}
+
+func BenchmarkDecodeHello(b *testing.B) {
+	conn := bytes.NewReader(helloResponse)
+	msgDec := newMessageDecoder()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		conn.Seek(0, io.SeekStart)
+
+		_, err := msgDec.DecodeHello(conn)
+		if err != nil {
+			b.Error(err)
+		}
+	}
+}
+
+// helloRequest is a hello D-Bus message.
+var helloRequest = []byte{108, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 110, 0, 0, 0, 6, 1, 115, 0, 20, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 68, 66, 117, 115, 0, 0, 0, 0, 3, 1, 115, 0, 5, 0, 0, 0, 72, 101, 108, 108, 111, 0, 0, 0, 2, 1, 115, 0, 20, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 68, 66, 117, 115, 0, 0, 0, 0, 1, 1, 111, 0, 21, 0, 0, 0, 47, 111, 114, 103, 47, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 47, 68, 66, 117, 115, 0, 0, 0}
+
+// helloResponse is a reply to helloRequest.
+var helloResponse = []byte{108, 2, 1, 1, 10, 0, 0, 0, 1, 0, 0, 0, 61, 0, 0, 0, 6, 1, 115, 0, 5, 0, 0, 0, 58, 49, 46, 52, 55, 0, 0, 0, 5, 1, 117, 0, 1, 0, 0, 0, 8, 1, 103, 0, 1, 115, 0, 0, 7, 1, 115, 0, 20, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 68, 66, 117, 115, 0, 0, 0, 0, 5, 0, 0, 0, 58, 49, 46, 52, 55, 0}
+
+// nameAcquiredSignal is a signal sent to a specific application
+// when it gains ownership of a name.
+var nameAcquiredSignal = []byte{108, 4, 1, 1, 11, 0, 0, 0, 2, 0, 0, 0, 141, 0, 0, 0, 1, 1, 111, 0, 21, 0, 0, 0, 47, 111, 114, 103, 47, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 47, 68, 66, 117, 115, 0, 0, 0, 2, 1, 115, 0, 20, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 68, 66, 117, 115, 0, 0, 0, 0, 3, 1, 115, 0, 12, 0, 0, 0, 78, 97, 109, 101, 65, 99, 113, 117, 105, 114, 101, 100, 0, 0, 0, 0, 6, 1, 115, 0, 6, 0, 0, 0, 58, 49, 46, 49, 48, 48, 0, 0, 8, 1, 103, 0, 1, 115, 0, 0, 7, 1, 115, 0, 20, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 68, 66, 117, 115, 0, 0, 0, 0, 6, 0, 0, 0, 58, 49, 46, 49, 48, 48, 0}
 
 func TestEncodeMainPID(t *testing.T) {
 	msgEnc := newMessageEncoder()
@@ -97,6 +141,24 @@ func BenchmarkDecodeMainPID(b *testing.B) {
 	}
 }
 
+func TestDecodeMainPIDSignal(t *testing.T) {
+	conn := io.MultiReader(
+		bytes.NewReader(nameAcquiredSignal),
+		bytes.NewReader(mainPIDResponse),
+	)
+	msgDec := newMessageDecoder()
+
+	pid, err := msgDec.DecodeMainPID(conn)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var want uint32 = 2375
+	if want != pid {
+		t.Errorf("expected pid %d got %d", want, pid)
+	}
+}
+
 func TestDecodeMainPIDError(t *testing.T) {
 	tt := map[string]struct {
 		in     []byte
@@ -149,6 +211,35 @@ var mainPIDUnknownPropertyResponse = []byte{108, 3, 1, 1, 76, 0, 0, 0, 47, 18, 0
 // when the unit is an unknown unit "blah".
 var mainPIDInvalidArgResponse = []byte{108, 3, 1, 1, 67, 0, 0, 0, 90, 18, 0, 0, 95, 0, 0, 0, 5, 1, 117, 0, 2, 0, 0, 0, 6, 1, 115, 0, 6, 0, 0, 0, 58, 49, 46, 53, 55, 49, 0, 0, 4, 1, 115, 0, 38, 0, 0, 0, 111, 114, 103, 46, 102, 114, 101, 101, 100, 101, 115, 107, 116, 111, 112, 46, 68, 66, 117, 115, 46, 69, 114, 114, 111, 114, 46, 73, 110, 118, 97, 108, 105, 100, 65, 114, 103, 115, 0, 0, 8, 1, 103, 0, 1, 115, 0, 0, 7, 1, 115, 0, 6, 0, 0, 0, 58, 49, 46, 52, 56, 57, 0, 0, 62, 0, 0, 0, 85, 110, 105, 116, 32, 110, 97, 109, 101, 32, 98, 108, 97, 104, 32, 105, 115, 32, 110, 101, 105, 116, 104, 101, 114, 32, 97, 32, 118, 97, 108, 105, 100, 32, 105, 110, 118, 111, 99, 97, 116, 105, 111, 110, 32, 73, 68, 32, 110, 111, 114, 32, 117, 110, 105, 116, 32, 110, 97, 109, 101, 46, 0}
 
+func TestEncodeListUnits(t *testing.T) {
+	msgEnc := newMessageEncoder()
+	conn := &bytes.Buffer{}
+	err := msgEnc.EncodeListUnits(conn, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := conn.Bytes()
+	if diff := cmp.Diff(listUnitsRequest, got); diff != "" {
+		t.Error(diff)
+	}
+}
+
+func BenchmarkEncodeListUnits(b *testing.B) {
+	msgEnc := newMessageEncoder()
+	conn := &bytes.Buffer{}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		conn.Reset()
+
+		err := msgEnc.EncodeListUnits(conn, 2)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 func TestDecodeListUnits(t *testing.T) {
 	conn := bytes.NewReader(listUnitsResponse)
 	msgDec := newMessageDecoder()
@@ -197,6 +288,26 @@ func BenchmarkDecodeListUnits(b *testing.B) {
 		if err != nil {
 			b.Error(err)
 		}
+	}
+}
+
+func TestDecodeListUnitsSignal(t *testing.T) {
+	conn := io.MultiReader(
+		bytes.NewReader(nameAcquiredSignal),
+		bytes.NewReader(listUnitsResponse),
+	)
+	msgDec := newMessageDecoder()
+	got := make([]Unit, 0, len(expectedServices))
+
+	err := msgDec.DecodeListUnits(conn, IsService, func(u *Unit) {
+		got = append(got, *u)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if diff := cmp.Diff(expectedServices, got); diff != "" {
+		t.Error(diff)
 	}
 }
 

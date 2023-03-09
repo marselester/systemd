@@ -71,10 +71,6 @@ func New(opts ...Option) (*Client, error) {
 		return nil, fmt.Errorf("dbus auth failed: %w", err)
 	}
 
-	if err = sendHello(conf.conn); err != nil {
-		return nil, fmt.Errorf("dbus hello failed: %w", err)
-	}
-
 	strConv := newStringConverter(conf.strConvSize)
 	msgEnc := messageEncoder{
 		Enc:  newEncoder(nil),
@@ -96,6 +92,10 @@ func New(opts ...Option) (*Client, error) {
 		msgDec:  &msgDec,
 	}
 
+	if err = c.hello(); err != nil {
+		return nil, fmt.Errorf("dbus Hello failed: %w", err)
+	}
+
 	return &c, nil
 }
 
@@ -109,6 +109,8 @@ type Client struct {
 	msgEnc  *messageEncoder
 	msgDec  *messageDecoder
 
+	// connName is a D-Bus connection name returned from Hello method.
+	connName string
 	// According to https://dbus.freedesktop.org/doc/dbus-specification.html
 	// D-Bus connection receives messages serially.
 	// The client doesn't have to wait for replies before sending more messages.
@@ -142,19 +144,54 @@ func (c *Client) nextMsgSerial() uint32 {
 
 // verifyMsgSerial verifies that the message serial sent
 // in the request matches the reply serial found in the header field.
-func verifyMsgSerial(h *header, wantSerial uint32) error {
-	var replySerial uint32
+func verifyMsgSerial(h *header, connName string, serial uint32) error {
 	for _, f := range h.Fields {
-		if f.Code == fieldReplySerial {
-			replySerial = uint32(f.U)
-			break
+		switch f.Code {
+		case fieldReplySerial:
+			replySerial := uint32(f.U)
+			if serial != replySerial {
+				return fmt.Errorf("message reply serial mismatch: want %d got %d", serial, replySerial)
+			}
+		case fieldDestination:
+			if connName != f.S {
+				return fmt.Errorf("message connection name mismatch: want %q got %q", connName, f.S)
+			}
 		}
 	}
 
-	if wantSerial != replySerial {
-		return fmt.Errorf("message reply serial mismatch: want %d got %d", wantSerial, replySerial)
-	}
 	return nil
+}
+
+// hello obtains a unique connection name, e.g., ":1.47".
+//
+// Before an application is able to send messages
+// to other applications it must send
+// the org.freedesktop.DBus.Hello message
+// to the message bus to obtain a unique name.
+//
+// If an application without a unique name
+// tries to send a message to another application,
+// or a message to the message bus itself
+// that isn't the org.freedesktop.DBus.Hello message,
+// it will be disconnected from the bus.
+func (c *Client) hello() error {
+	serial := c.nextMsgSerial()
+
+	err := c.msgEnc.EncodeHello(c.conf.conn, serial)
+	if err != nil {
+		return fmt.Errorf("encode Hello: %w", err)
+	}
+
+	c.connName, err = c.msgDec.DecodeHello(c.bufConn)
+	if err != nil {
+		return fmt.Errorf("decode Hello: %w", err)
+	}
+
+	if c.conf.isSerialCheckEnabled {
+		err = verifyMsgSerial(c.msgDec.Header(), c.connName, serial)
+	}
+
+	return err
 }
 
 // ListUnits fetches systemd units,
@@ -186,7 +223,7 @@ func (c *Client) ListUnits(p Predicate, f func(*Unit)) error {
 	}
 
 	if c.conf.isSerialCheckEnabled {
-		err = verifyMsgSerial(c.msgDec.Header(), serial)
+		err = verifyMsgSerial(c.msgDec.Header(), c.connName, serial)
 	}
 
 	return err
@@ -222,7 +259,7 @@ func (c *Client) MainPID(service string) (pid uint32, err error) {
 	}
 
 	if c.conf.isSerialCheckEnabled {
-		err = verifyMsgSerial(c.msgDec.Header(), serial)
+		err = verifyMsgSerial(c.msgDec.Header(), c.connName, serial)
 	}
 
 	return pid, err

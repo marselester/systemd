@@ -93,6 +93,40 @@ func (d *messageDecoder) Header() *header {
 	return &d.hdr
 }
 
+// DecodeHello decodes hello reply from systemd
+// org.freedesktop.DBus.Hello method
+// and returns a connection name, e.g., ":1.47".
+func (d *messageDecoder) DecodeHello(conn io.Reader) (string, error) {
+	d.Dec.Reset(conn)
+
+	err := decodeHeader(d.Dec, d.Conv, &d.hdr, d.SkipHeaderFields)
+	if err != nil {
+		return "", fmt.Errorf("message header: %w", err)
+	}
+
+	body := io.LimitReader(
+		conn,
+		int64(d.hdr.BodyLen),
+	)
+	d.Dec.Reset(body)
+
+	// Decode an error reply.
+	if d.hdr.Type == msgTypeError {
+		s, err := d.Dec.String()
+		if err != nil {
+			return "", fmt.Errorf("decode error reply: %w", err)
+		}
+		return "", fmt.Errorf(d.Conv.String(s))
+	}
+
+	var connName []byte
+	if connName, err = d.Dec.String(); err != nil {
+		return "", fmt.Errorf("decode connection name: %w", err)
+	}
+
+	return d.Conv.String(connName), nil
+}
+
 // DecodeListUnits decodes a reply from systemd ListUnits method.
 // The pointer to Unit struct in f must not be retained,
 // because its fields change on each f call.
@@ -126,14 +160,22 @@ func (d *messageDecoder) DecodeListUnits(conn io.Reader, p Predicate, f func(*Un
 	)
 	d.Dec.Reset(body)
 
+	switch d.hdr.Type {
 	// Decode an error reply.
-	if d.hdr.Type == msgTypeError {
+	case msgTypeError:
 		s, err := d.Dec.String()
 		if err != nil {
 			return fmt.Errorf("decode error reply: %w", err)
 		}
-
 		return fmt.Errorf(d.Conv.String(s))
+	// Discard the signal that came before the expected reply,
+	// i.e., "name acquired" signal.
+	case msgTypeSignal:
+		if _, err = d.Dec.ReadN(d.hdr.BodyLen); err != nil {
+			return fmt.Errorf("discard signal body: %w", err)
+		}
+		// Decode the following message.
+		return d.DecodeListUnits(conn, p, f)
 	}
 
 	// ListUnits has a body signature "a(ssssssouso)" which is
@@ -235,14 +277,22 @@ func (d *messageDecoder) DecodeMainPID(conn io.Reader) (uint32, error) {
 	)
 	d.Dec.Reset(body)
 
+	switch d.hdr.Type {
 	// Decode an error reply, e.g., invalid unit name.
-	if d.hdr.Type == msgTypeError {
+	case msgTypeError:
 		s, err := d.Dec.String()
 		if err != nil {
 			return 0, fmt.Errorf("decode error reply: %w", err)
 		}
-
 		return 0, fmt.Errorf(d.Conv.String(s))
+	// Discard the signal that came before the expected reply,
+	// i.e., "name acquired" signal.
+	case msgTypeSignal:
+		if _, err = d.Dec.ReadN(d.hdr.BodyLen); err != nil {
+			return 0, fmt.Errorf("discard signal body: %w", err)
+		}
+		// Decode the following message.
+		return d.DecodeMainPID(conn)
 	}
 
 	// Discard known signature "u".
@@ -272,6 +322,36 @@ type messageEncoder struct {
 
 	// buf is a buffer where an encoder writes the message.
 	buf bytes.Buffer
+}
+
+// EncodeHello encodes a hello request.
+func (e *messageEncoder) EncodeHello(conn io.Writer, msgSerial uint32) error {
+	// Reset the encoder to encode the header.
+	e.buf.Reset()
+	e.Enc.Reset(&e.buf)
+
+	h := header{
+		ByteOrder: littleEndian,
+		Type:      msgTypeMethodCall,
+		Proto:     1,
+		Serial:    msgSerial,
+		Fields: []headerField{
+			{Signature: "s", S: "org.freedesktop.DBus", Code: fieldDestination},
+			{Signature: "s", S: "Hello", Code: fieldMember},
+			{Signature: "s", S: "org.freedesktop.DBus", Code: fieldInterface},
+			{Signature: "o", S: "/org/freedesktop/DBus", Code: fieldPath},
+		},
+	}
+	err := encodeHeader(e.Enc, &h)
+	if err != nil {
+		return fmt.Errorf("message header: %w", err)
+	}
+
+	if _, err = conn.Write(e.buf.Bytes()); err != nil {
+		return fmt.Errorf("write message: %w", err)
+	}
+
+	return nil
 }
 
 // EncodeListUnits encodes a request to systemd ListUnits method.
