@@ -4,7 +4,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/marselester/systemd)](https://goreportcard.com/report/github.com/marselester/systemd)
 
 This package provides an access to systemd via D-Bus
-to list services with a low overhead for a caller.
+to list services (think `systemctl list-units`) with a low overhead for a caller.
 If you find the API too limiting or missing some of functionality,
 perhaps https://github.com/coreos/go-systemd might suit you better.
 
@@ -38,6 +38,13 @@ $ go run ./cmd/units -svc
 0 snapd.session-agent.service inactive
 0 gpg-agent.service inactive
 0 pk-debconf-helper.service inactive
+```
+
+You can get the same results with `dbus-send`.
+
+```sh
+$ dbus-send --system --print-reply --dest=org.freedesktop.systemd1 /org/freedesktop/systemd1 org.freedesktop.systemd1.Manager.ListUnits
+$ dbus-send --system --print-reply --dest=org.freedesktop.systemd1 /org/freedesktop/systemd1/unit/dbus_2eservice org.freedesktop.DBus.Properties.Get string:'org.freedesktop.systemd1.Service' string:'MainPID'
 ```
 
 ## Testing

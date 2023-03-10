@@ -192,14 +192,16 @@ const (
 	// i.e., the body must be 0-length.
 	// This header field is controlled by the message sender.
 	fieldSignature
-	// fieldUnixFDs is the number of Unix file descriptors that accompany the message.
-	// If omitted, it is assumed that no Unix file descriptors accompany the message.
-	// The actual file descriptors need to be transferred via platform specific mechanism out-of-band.
-	// They must be sent at the same time as part of the message itself.
-	// They may not be sent before the first byte of the message itself is transferred
-	// or after the last byte of the message itself.
-	// This header field is controlled by the message sender.
-	fieldUnixFDs
+)
+
+// D-Bus types,
+// see https://dbus.freedesktop.org/doc/dbus-specification.html#id-1.3.8.
+const (
+	typeByte       = 'y'
+	typeUint32     = 'u'
+	typeString     = 's'
+	typeObjectPath = 'o'
+	typeSignature  = 'g'
 )
 
 // headerField represents a header field.
@@ -218,34 +220,6 @@ type headerField struct {
 
 	// Code is a header field code, e.g., fieldPath.
 	Code byte
-}
-
-func (f *headerField) String() string {
-	var name string
-	switch f.Code {
-	case fieldPath:
-		name = "PATH"
-	case fieldInterface:
-		name = "INTERFACE"
-	case fieldMember:
-		name = "MEMBER"
-	case fieldErrorName:
-		name = "ERROR_NAME"
-	case fieldReplySerial:
-		name = "REPLY_SERIAL"
-	case fieldDestination:
-		name = "DESTINATION"
-	case fieldSender:
-		name = "SENDER"
-	case fieldSignature:
-		name = "SIGNATURE"
-	case fieldUnixFDs:
-		name = "UNIX_FDS"
-	default:
-		name = "INVALID"
-	}
-
-	return name
 }
 
 // decodeHeaderField decodes a header field.
@@ -280,20 +254,17 @@ func decodeHeaderField(d *decoder, conv *stringConverter) (f headerField, err er
 		s []byte
 	)
 	switch sign[0] {
-	// UINT32 type.
-	case 'u':
+	case typeUint32:
 		if u, err = d.Uint32(); err != nil {
 			return
 		}
 		f.U = uint64(u)
-	// STRING, OBJECT_PATH types.
-	case 's', 'o':
+	case typeString, typeObjectPath:
 		if s, err = d.String(); err != nil {
 			return
 		}
 		f.S = conv.String(s)
-	// SIGNATURE type.
-	case 'g':
+	case typeSignature:
 		if s, err = d.Signature(); err != nil {
 			return
 		}
@@ -367,14 +338,11 @@ func encodeHeaderField(e *encoder, f headerField) error {
 	e.Signature(f.Signature)
 
 	switch f.Signature[0] {
-	// UINT32 type.
-	case 'u':
+	case typeUint32:
 		e.Uint32(uint32(f.U))
-	// STRING, OBJECT_PATH types.
-	case 's', 'o':
+	case typeString, typeObjectPath:
 		e.String(f.S)
-	// SIGNATURE type.
-	case 'g':
+	case typeSignature:
 		e.Signature(f.S)
 	default:
 		return fmt.Errorf("unknown type: %s", f.Signature)
