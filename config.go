@@ -2,9 +2,13 @@ package systemd
 
 import (
 	"net"
+	"time"
 )
 
 const (
+	// DefaultConnectionTimeout is the default
+	// read/write timeout associated with the connection.
+	DefaultConnectionTimeout = time.Second
 	// DefaultConnectionReadSize is the default size (in bytes)
 	// of the buffer which is used for reading from a connection.
 	// Buffering reduces count of read syscalls,
@@ -26,6 +30,8 @@ const (
 type Config struct {
 	// conn is a connection to a D-Bus server.
 	conn *net.UnixConn
+	// connTimeout is a connection timeout set with SetDeadline.
+	connTimeout time.Duration
 	// connReadSize defines the length of a buffer to read from
 	// a D-Bus connection.
 	connReadSize int
@@ -43,6 +49,14 @@ type Option func(*Config)
 func WithConnection(conn *net.UnixConn) Option {
 	return func(c *Config) {
 		c.conn = conn
+	}
+}
+
+// WithTimeout sets the read and write timeouts associated
+// with the connection.
+func WithTimeout(timeout time.Duration) Option {
+	return func(c *Config) {
+		c.connTimeout = timeout
 	}
 }
 

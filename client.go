@@ -11,6 +11,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Dial connects to dbus via a Unix domain socket
@@ -45,6 +46,7 @@ func Dial(busAddr string) (*net.UnixConn, error) {
 // https://dbus.freedesktop.org/doc/dbus-specification.html.
 func New(opts ...Option) (*Client, error) {
 	conf := Config{
+		connTimeout:          DefaultConnectionTimeout,
 		connReadSize:         DefaultConnectionReadSize,
 		strConvSize:          DefaultStringConverterSize,
 		isSerialCheckEnabled: false,
@@ -65,6 +67,11 @@ func New(opts ...Option) (*Client, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	err = conf.conn.SetDeadline(time.Now().Add(conf.connTimeout))
+	if err != nil {
+		return nil, fmt.Errorf("dbus set deadline failed: %w", err)
 	}
 
 	if err = authExternal(conf.conn); err != nil {
@@ -208,11 +215,16 @@ func (c *Client) ListUnits(p Predicate, f func(*Unit)) error {
 	}
 	defer c.mu.Unlock()
 
+	err := c.conf.conn.SetDeadline(time.Now().Add(c.conf.connTimeout))
+	if err != nil {
+		return fmt.Errorf("set deadline: %w", err)
+	}
+
 	serial := c.nextMsgSerial()
 	// Send a dbus message that calls
 	// org.freedesktop.systemd1.Manager.ListUnits method
 	// to get an array of all currently loaded systemd units.
-	err := c.msgEnc.EncodeListUnits(c.conf.conn, serial)
+	err = c.msgEnc.EncodeListUnits(c.conf.conn, serial)
 	if err != nil {
 		return fmt.Errorf("encode ListUnits: %w", err)
 	}
@@ -237,11 +249,16 @@ func (c *Client) ListUnits(p Predicate, f func(*Unit)) error {
 // because that would imply concurrent reading from the same underlying connection.
 // Simply waiting on a lock won't help, because ListUnits won't be able to
 // finish waiting for MainPID, thus creating a deadlock.
-func (c *Client) MainPID(service string) (pid uint32, err error) {
+func (c *Client) MainPID(service string) (uint32, error) {
 	if !c.mu.TryLock() {
 		return 0, fmt.Errorf("must be called serially")
 	}
 	defer c.mu.Unlock()
+
+	err := c.conf.conn.SetDeadline(time.Now().Add(c.conf.connTimeout))
+	if err != nil {
+		return 0, fmt.Errorf("set deadline: %w", err)
+	}
 
 	serial := c.nextMsgSerial()
 	// Send a dbus message that calls
@@ -253,6 +270,7 @@ func (c *Client) MainPID(service string) (pid uint32, err error) {
 		return 0, fmt.Errorf("encode MainPID: %w", err)
 	}
 
+	var pid uint32
 	pid, err = c.msgDec.DecodeMainPID(c.bufConn)
 	if err != nil {
 		return pid, fmt.Errorf("decode MainPID: %w", err)

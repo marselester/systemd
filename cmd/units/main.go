@@ -1,4 +1,5 @@
-// Program units prints systemd units.
+// Program units prints systemd units
+// to show how the package can be configured if needed.
 package main
 
 import (
@@ -6,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/marselester/systemd"
 )
@@ -19,9 +21,12 @@ func main() {
 	addr := flag.String("addr", "", "bus address")
 	onlyServices := flag.Bool("svc", false, "show only services")
 	checkSerial := flag.Bool("serial", false, "check message serial")
+	timeout := flag.Duration("timeout", time.Second, "connection read/write timeout")
 	flag.Parse()
 
-	var opts []systemd.Option
+	opts := []systemd.Option{
+		systemd.WithTimeout(*timeout),
+	}
 	if *checkSerial {
 		opts = append(opts, systemd.WithSerialCheck())
 	}
