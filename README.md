@@ -63,7 +63,7 @@ It is recommended to run benchmarks multiple times and check
 how stable they are using [Benchstat](https://pkg.go.dev/golang.org/x/perf/cmd/benchstat) tool.
 
 ```sh
-$ go test -timeout 20m -bench=. -benchmem -count=100 . | tee bench-new.txt
+$ go test -timeout 20m -bench=. -benchmem -count=50 . | tee bench-new.txt
 $ benchstat bench-new.txt
 ```
 
@@ -81,34 +81,43 @@ $ benchstat bench-old.txt bench-new.txt
 
 ```
 name               old time/op    new time/op    delta
-DecodeString-2       54.3ns ± 3%    53.8ns ± 2%   -0.82%  (p=0.000 n=97+100)
-EscapeBusLabel-2     47.6ns ± 3%    47.5ns ± 2%     ~     (p=0.602 n=99+100)
-DecodeHeader-2        341ns ± 5%     339ns ± 7%   -0.50%  (p=0.001 n=92+97)
-EncodeHeader-2        190ns ± 5%     185ns ± 2%   -2.17%  (p=0.000 n=99+100)
-EncodeListUnits-2     233ns ± 3%     232ns ± 3%   -0.34%  (p=0.043 n=93+96)
-EncodeMainPID-2       377ns ± 3%     374ns ± 2%   -0.76%  (p=0.000 n=93+86)
-DecodeMainPID-2       135ns ± 4%     133ns ± 4%   -1.03%  (p=0.000 n=98+96)
-DecodeListUnits-2    93.3µs ± 4%    94.0µs ± 3%   +0.73%  (p=0.001 n=99+95)
+AuthExternal-2        476ns ± 3%     475ns ± 2%    ~     (p=0.979 n=48+46)
+DecodeString-2       54.3ns ± 4%    54.3ns ± 3%    ~     (p=0.878 n=47+49)
+EscapeBusLabel-2     43.1ns ± 2%    43.8ns ± 2%  +1.58%  (p=0.000 n=49+48)
+DecodeHeader-2        340ns ± 5%     340ns ± 4%    ~     (p=0.626 n=46+48)
+EncodeHeader-2        186ns ± 4%     185ns ± 1%    ~     (p=0.312 n=48+48)
+EncodeHello-2         222ns ± 3%     224ns ± 2%  +0.57%  (p=0.002 n=44+46)
+DecodeHello-2         123ns ± 7%     122ns ± 4%    ~     (p=0.708 n=50+49)
+EncodeMainPID-2       377ns ± 3%     383ns ± 4%  +1.62%  (p=0.000 n=47+43)
+DecodeMainPID-2       140ns ± 5%     140ns ± 2%    ~     (p=0.644 n=49+48)
+EncodeListUnits-2     237ns ± 4%     234ns ± 2%  -1.29%  (p=0.000 n=48+41)
+DecodeListUnits-2    93.3µs ± 4%    92.9µs ± 2%    ~     (p=0.500 n=48+48)
 
 name               old alloc/op   new alloc/op   delta
-DecodeString-2        0.00B          0.00B          ~     (all equal)
-EscapeBusLabel-2      0.00B          0.00B          ~     (all equal)
-DecodeHeader-2        15.0B ± 0%     15.0B ± 0%     ~     (all equal)
-EncodeHeader-2        0.00B          0.00B          ~     (all equal)
-EncodeListUnits-2     0.00B          0.00B          ~     (all equal)
-EncodeMainPID-2       45.0B ± 0%     45.0B ± 0%     ~     (all equal)
-DecodeMainPID-2       24.0B ± 0%     24.0B ± 0%     ~     (all equal)
-DecodeListUnits-2    25.6kB ± 0%    21.0kB ± 0%  -18.01%  (p=0.000 n=100+100)
+AuthExternal-2        80.0B ± 0%     80.0B ± 0%    ~     (all equal)
+DecodeString-2        0.00B          0.00B         ~     (all equal)
+EscapeBusLabel-2      0.00B          0.00B         ~     (all equal)
+DecodeHeader-2        15.0B ± 0%     15.0B ± 0%    ~     (all equal)
+EncodeHeader-2        0.00B          0.00B         ~     (all equal)
+EncodeHello-2         0.00B          0.00B         ~     (all equal)
+DecodeHello-2         29.0B ± 0%     29.0B ± 0%    ~     (all equal)
+EncodeMainPID-2       45.0B ± 0%     45.0B ± 0%    ~     (all equal)
+DecodeMainPID-2       24.0B ± 0%     24.0B ± 0%    ~     (all equal)
+EncodeListUnits-2     0.00B          0.00B         ~     (all equal)
+DecodeListUnits-2    21.0kB ± 0%    21.0kB ± 0%    ~     (p=0.071 n=50+50)
 
 name               old allocs/op  new allocs/op  delta
-DecodeString-2         0.00           0.00          ~     (all equal)
-EscapeBusLabel-2       0.00           0.00          ~     (all equal)
-DecodeHeader-2         0.00           0.00          ~     (all equal)
-EncodeHeader-2         0.00           0.00          ~     (all equal)
-EncodeListUnits-2      0.00           0.00          ~     (all equal)
-EncodeMainPID-2        0.00           0.00          ~     (all equal)
-DecodeMainPID-2        1.00 ± 0%      1.00 ± 0%     ~     (all equal)
-DecodeListUnits-2      7.00 ± 0%      6.00 ± 0%  -14.29%  (p=0.000 n=100+100)
+AuthExternal-2         3.00 ± 0%      3.00 ± 0%    ~     (all equal)
+DecodeString-2         0.00           0.00         ~     (all equal)
+EscapeBusLabel-2       0.00           0.00         ~     (all equal)
+DecodeHeader-2         0.00           0.00         ~     (all equal)
+EncodeHeader-2         0.00           0.00         ~     (all equal)
+EncodeHello-2          0.00           0.00         ~     (all equal)
+DecodeHello-2          1.00 ± 0%      1.00 ± 0%    ~     (all equal)
+EncodeMainPID-2        0.00           0.00         ~     (all equal)
+DecodeMainPID-2        1.00 ± 0%      1.00 ± 0%    ~     (all equal)
+EncodeListUnits-2      0.00           0.00         ~     (all equal)
+DecodeListUnits-2      6.00 ± 0%      6.00 ± 0%    ~     (all equal)
 ```
 
 </details>

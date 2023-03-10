@@ -1,7 +1,7 @@
-// Package systemd provides access to systemd via dbus
+// Package systemd provides access to systemd via D-Bus
 // using Unix domain sockets as a transport.
-// The objective of this package is to list processes
-// with low overhead for the caller.
+// The objective of this package is to list services
+// with a low overhead for a caller.
 package systemd
 
 import (
