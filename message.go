@@ -81,8 +81,9 @@ type messageDecoder struct {
 	SkipHeaderFields bool
 
 	// The following fields are reused to reduce memory allocs.
-	unit Unit
-	hdr  header
+	bodyReader io.LimitedReader
+	unit       Unit
+	hdr        header
 }
 
 // Header returns the recently decoded header
@@ -104,11 +105,9 @@ func (d *messageDecoder) DecodeHello(conn io.Reader) (string, error) {
 		return "", fmt.Errorf("message header: %w", err)
 	}
 
-	body := io.LimitReader(
-		conn,
-		int64(d.hdr.BodyLen),
-	)
-	d.Dec.Reset(body)
+	d.bodyReader.R = conn
+	d.bodyReader.N = int64(d.hdr.BodyLen)
+	d.Dec.Reset(&d.bodyReader)
 
 	// Decode an error reply.
 	if d.hdr.Type == msgTypeError {
@@ -154,11 +153,9 @@ func (d *messageDecoder) DecodeListUnits(conn io.Reader, p Predicate, f func(*Un
 	// we should stop reading at offset 35794,
 	// because the body starts at offset 80,
 	// i.e., offset 35794 = 16 head + 61 header + 3 padding + 35714 body.
-	body := io.LimitReader(
-		conn,
-		int64(d.hdr.BodyLen),
-	)
-	d.Dec.Reset(body)
+	d.bodyReader.R = conn
+	d.bodyReader.N = int64(d.hdr.BodyLen)
+	d.Dec.Reset(&d.bodyReader)
 
 	switch d.hdr.Type {
 	// Decode an error reply.
@@ -271,11 +268,9 @@ func (d *messageDecoder) DecodeMainPID(conn io.Reader) (uint32, error) {
 		return 0, fmt.Errorf("message header: %w", err)
 	}
 
-	body := io.LimitReader(
-		conn,
-		int64(d.hdr.BodyLen),
-	)
-	d.Dec.Reset(body)
+	d.bodyReader.R = conn
+	d.bodyReader.N = int64(d.hdr.BodyLen)
+	d.Dec.Reset(&d.bodyReader)
 
 	switch d.hdr.Type {
 	// Decode an error reply, e.g., invalid unit name.
