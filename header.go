@@ -223,24 +223,26 @@ type headerField struct {
 }
 
 // decodeHeaderField decodes a header field.
-func decodeHeaderField(d *decoder, conv *stringConverter) (f headerField, err error) {
+func decodeHeaderField(d *decoder, conv *stringConverter) (headerField, error) {
+	var f headerField
 	// Since "(yv)" struct is being decoded, an alignment must be discarded.
-	if err = d.Align(8); err != nil {
-		return
+	err := d.Align(8)
+	if err != nil {
+		return f, err
 	}
 
 	// Decode "y" (a byte) which is a field code.
 	if f.Code, err = d.Byte(); err != nil {
-		return
+		return f, err
 	}
 
 	// Decode "v" (variant) which is a field value.
-	// Variants are marshalled as the SIGNATURE of the contents
+	// Variants are marshaled as the SIGNATURE of the contents
 	// (which must be a single complete type),
-	// followed by a marshalled value with the type given by that signature.
+	// followed by a marshaled value with the type given by that signature.
 	var sign []byte
 	if sign, err = d.Signature(); err != nil {
-		return
+		return f, err
 	}
 	// Container types are not supported yet.
 	// Because there is no need in the scope of this library.
@@ -256,24 +258,24 @@ func decodeHeaderField(d *decoder, conv *stringConverter) (f headerField, err er
 	switch sign[0] {
 	case typeUint32:
 		if u, err = d.Uint32(); err != nil {
-			return
+			return f, err
 		}
 		f.U = uint64(u)
 	case typeString, typeObjectPath:
 		if s, err = d.String(); err != nil {
-			return
+			return f, err
 		}
 		f.S = conv.String(s)
 	case typeSignature:
 		if s, err = d.Signature(); err != nil {
-			return
+			return f, err
 		}
 		f.S = conv.String(s)
 	default:
 		return f, fmt.Errorf("unknown type: %s", sign)
 	}
 
-	return
+	return f, err
 }
 
 // encodeHeader encodes the message header h.

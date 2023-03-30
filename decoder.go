@@ -176,9 +176,9 @@ func nextOffset(current, align uint32) (next, padding uint32) {
 	return next, padding
 }
 
-func newStringConverter(cap int) *stringConverter {
+func newStringConverter(capacity int) *stringConverter {
 	return &stringConverter{
-		buf:    make([]byte, 0, cap),
+		buf:    make([]byte, 0, capacity),
 		offset: 0,
 	}
 }
