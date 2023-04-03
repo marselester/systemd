@@ -30,40 +30,20 @@ func main() {
 	if *checkSerial {
 		opts = append(opts, systemd.WithSerialCheck())
 	}
-
-	var (
-		c   *systemd.Client
-		err error
-	)
-	if *addr == "" {
-		if c, err = systemd.New(opts...); err != nil {
-			log.Print(err)
-			return
-		}
-		defer func() {
-			if err = c.Close(); err != nil {
-				log.Print(err)
-			}
-		}()
-	} else {
-		conn, err := systemd.Dial(*addr)
-		if err != nil {
-			log.Print(err)
-			return
-		}
-		defer func() {
-			if err = conn.Close(); err != nil {
-				log.Print(err)
-			}
-		}()
-
-		opts = append(opts, systemd.WithConnection(conn))
-		c, err = systemd.New(opts...)
-		if err != nil {
-			log.Print(err)
-			return
-		}
+	if *addr != "" {
+		opts = append(opts, systemd.WithAddress(*addr))
 	}
+
+	c, err := systemd.New(opts...)
+	if err != nil {
+		log.Print(err)
+		return
+	}
+	defer func() {
+		if err = c.Close(); err != nil {
+			log.Print(err)
+		}
+	}()
 
 	if *onlyServices {
 		err = printServices(c)
